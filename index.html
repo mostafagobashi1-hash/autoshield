@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#123047">
+<title>AutoShield | إدارة محل حماية السيارات</title>
+<style>
+:root{--navy:#123047;--teal:#147d80;--bg:#f3f6f8;--line:#dbe3e8;--text:#182b38;--muted:#637783;--white:#fff}
+*{box-sizing:border-box}body{margin:0;font-family:Tahoma,Arial,sans-serif;background:var(--bg);color:var(--text)}
+header{background:var(--navy);color:white;padding:18px 22px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+header h1{font-size:21px;margin:0 0 5px}header small{opacity:.8}
+.layout{display:grid;grid-template-columns:220px 1fr;min-height:calc(100vh - 76px)}
+nav{background:#fff;border-left:1px solid var(--line);padding:14px}
+nav button{display:block;width:100%;text-align:right;padding:12px;margin:4px 0;border:0;border-radius:9px;background:white;color:var(--text);cursor:pointer;font-size:14px}
+nav button.active,nav button:hover{background:#e5f2f2;color:#075d60;font-weight:bold}
+main{padding:22px;min-width:0}.cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:18px}
+.card,.panel{background:white;border:1px solid var(--line);border-radius:13px;padding:16px}
+.card .label{color:var(--muted);font-size:13px}.card .value{font-size:25px;font-weight:bold;margin-top:8px}
+h2{font-size:20px;margin:0 0 15px}h3{font-size:16px;margin:0 0 12px}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+button,.btn{border:0;border-radius:8px;padding:10px 14px;cursor:pointer;font-family:inherit}
+.primary{background:var(--teal);color:#fff}.secondary{background:#e9eff2;color:#234}.danger{background:#fae8e7;color:#9a2520}
+input,select,textarea{font:inherit;width:100%;padding:10px;border:1px solid #ccd7de;border-radius:8px;background:white}
+label{display:block;font-size:13px;color:var(--muted);margin-bottom:5px}
+.formgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:14px}
+table{width:100%;border-collapse:collapse;background:white}th,td{padding:11px 9px;text-align:right;border-bottom:1px solid var(--line);font-size:13px;vertical-align:top}
+th{background:#f6f9fa;color:#526873} .tablewrap{overflow:auto;border:1px solid var(--line);border-radius:10px}
+.muted{color:var(--muted);font-size:13px}.pill{display:inline-block;background:#e8f5f3;color:#126a64;border-radius:20px;padding:4px 8px;font-size:12px}
+.hidden{display:none!important}.section{display:none}.section.active{display:block}.notice{padding:12px;background:#fff8dc;border:1px solid #eadb91;border-radius:9px;margin-bottom:15px;font-size:13px}
+.empty{padding:25px;text-align:center;color:var(--muted)}
+@media(max-width:900px){.layout{grid-template-columns:1fr}nav{display:flex;overflow:auto;border-left:0;border-bottom:1px solid var(--line);gap:5px}nav button{white-space:nowrap;width:auto;min-width:max-content}.cards{grid-template-columns:repeat(2,minmax(0,1fr))}.formgrid{grid-template-columns:repeat(2,minmax(0,1fr))}main{padding:14px}}
+@media(max-width:540px){.formgrid{grid-template-columns:1fr}.cards{grid-template-columns:repeat(2,minmax(0,1fr))}header{padding:14px}}
+@media print{header,nav,.no-print,.toolbar,button{display:none!important}.layout{display:block}main{padding:0}.section{display:none!important}.section.active{display:block!important}.panel{border:0}.tablewrap{border:0}body{background:white}}
+</style>
+</head>
+<body>
+<header>
+ <div><h1>AutoShield</h1><small>نظام إدارة محل حماية السيارات — نسخة تجريبية محلية</small></div>
+ <div class="muted" style="color:#dbe9ee">العملة: جنيه مصري (EGP)</div>
+</header>
+<div class="layout">
+<nav class="no-print">
+ <button class="active" data-page="dashboard">لوحة التحكم</button>
+ <button data-page="customers">العملاء والسيارات</button>
+ <button data-page="orders">أوامر الشغل</button>
+ <button data-page="services">الخدمات والأسعار</button>
+ <button data-page="inventory">المخزون</button>
+ <button data-page="backup">النسخ الاحتياطي</button>
+</nav>
+<main>
+ <div class="notice"><b>تنبيه مهم:</b> هذه نسخة أولية تعمل على هذا الجهاز وتحفظ البيانات محليًا في المتصفح. لا يوجد حتى الآن مزامنة سحابية أو تسجيل دخول وصلاحيات متعددة؛ لا تستخدمها كقاعدة بيانات الإنتاج الوحيدة.</div>
+<section id="dashboard" class="section active">
+ <h2>لوحة التحكم</h2>
+ <div class="cards">
+  <div class="card"><div class="label">العملاء</div><div class="value" id="statCustomers">0</div></div>
+  <div class="card"><div class="label">السيارات</div><div class="value" id="statVehicles">0</div></div>
+  <div class="card"><div class="label">أوامر الشغل</div><div class="value" id="statOrders">0</div></div>
+  <div class="card"><div class="label">إجمالي أوامر الشغل</div><div class="value" id="statRevenue">0 ج.م</div></div>
+ </div>
+ <div class="panel"><h3>آخر أوامر الشغل</h3><div id="recentOrders"></div></div>
+</section>
+<section id="customers" class="section">
+ <h2>العملاء والسيارات</h2>
+ <div class="panel">
+  <h3>إضافة عميل وسيارته</h3>
+  <form id="customerForm">
+   <div class="formgrid">
+    <div><label>اسم العميل *</label><input name="name" required></div>
+    <div><label>رقم الهاتف *</label><input name="phone" required></div>
+    <div><label>رقم اللوحة</label><input name="plate"></div>
+    <div><label>ماركة السيارة</label><input name="make" placeholder="مثال: Toyota"></div>
+    <div><label>الموديل</label><input name="model"></div>
+    <div><label>اللون</label><input name="color"></div>
+   </div>
+   <button class="primary">حفظ العميل والسيارة</button>
+  </form>
+ </div>
+ <div class="panel" style="margin-top:14px"><h3>قائمة العملاء</h3><div id="customersTable"></div></div>
+</section>
+<section id="orders" class="section">
+ <h2>أوامر الشغل</h2>
+ <div class="panel">
+  <h3>إنشاء أمر شغل</h3>
+  <form id="orderForm">
+   <div class="formgrid">
+    <div><label>العميل والسيارة *</label><select name="vehicleId" id="vehicleSelect" required></select></div>
+    <div><label>الخدمة *</label><select name="serviceId" id="serviceSelect" required></select></div>
+    <div><label>السعر المتفق عليه (ج.م) *</label><input name="price" type="number" min="0" step="0.01" required></div>
+    <div><label>الفني المسؤول</label><input name="technician" placeholder="اسم الفني"></div>
+    <div><label>موعد التسليم المتوقع</label><input name="dueDate" type="date"></div>
+    <div><label>حالة أمر الشغل</label><select name="status"><option>استلام جديد</option><option>بانتظار الموافقة</option><option>بانتظار التنفيذ</option><option>جاري التنفيذ</option><option>مراجعة الجودة</option><option>جاهز للتسليم</option><option>تم التسليم</option><option>متوقف</option><option>ملغي</option></select></div>
+    <div><label>العربون (ج.م)</label><input name="deposit" type="number" min="0" step="0.01" value="0"></div>
+    <div><label>ملاحظات</label><input name="notes"></div>
+   </div>
+   <button class="primary">إنشاء أمر الشغل</button>
+  </form>
+ </div>
+ <div class="panel" style="margin-top:14px"><h3>قائمة أوامر الشغل</h3><div class="toolbar no-print"><button class="secondary" onclick="window.print()">طباعة القائمة</button></div><div id="ordersTable"></div></div>
+</section>
+<section id="services" class="section">
+ <h2>الخدمات والأسعار</h2>
+ <div class="panel">
+  <h3>إضافة خدمة</h3>
+  <form id="serviceForm"><div class="formgrid">
+   <div><label>اسم الخدمة *</label><input name="name" required></div>
+   <div><label>السعر الافتراضي (ج.م)</label><input name="price" type="number" min="0" step=".01" value="0"></div>
+   <div><label>ملاحظات</label><input name="notes"></div>
+  </div><button class="primary">إضافة الخدمة</button></form>
+ </div>
+ <div class="panel" style="margin-top:14px"><h3>الخدمات المتاحة</h3><div id="servicesTable"></div></div>
+</section>
+<section id="inventory" class="section">
+ <h2>المخزون — متابعة حسب الخدمة</h2>
+ <div class="notice">في هذه النسخة نسجل أصناف المخزون وكمياتها. ربط الاستهلاك الفعلي لكل خدمة، تكلفة المتر/الرول، والهالك يحتاج المرحلة التالية من قاعدة البيانات.</div>
+ <div class="panel"><h3>إضافة صنف</h3>
+  <form id="productForm"><div class="formgrid">
+   <div><label>اسم الصنف *</label><input name="name" required placeholder="مثال: فيلم PPF"></div>
+   <div><label>وحدة القياس</label><select name="unit"><option>رول</option><option>متر</option><option>قطعة</option><option>عبوة</option><option>لتر</option></select></div>
+   <div><label>الكمية الحالية</label><input name="qty" type="number" min="0" step=".01" value="0"></div>
+   <div><label>حد التنبيه</label><input name="minQty" type="number" min="0" step=".01" value="0"></div>
+   <div><label>تكلفة الوحدة (ج.م)</label><input name="cost" type="number" min="0" step=".01" value="0"></div>
+  </div><button class="primary">إضافة الصنف</button></form>
+ </div>
+ <div class="panel" style="margin-top:14px"><h3>الأصناف</h3><div id="inventoryTable"></div></div>
+</section>
+<section id="backup" class="section">
+ <h2>النسخ الاحتياطي</h2>
+ <div class="panel">
+  <p>صدّر نسخة JSON للاحتفاظ ببياناتك، أو استورد نسخة سابقة. احتفظ بنسخة خارج الجهاز. هذا لا يغني عن النسخ الاحتياطي السحابي في النسخة الإنتاجية.</p>
+  <div class="toolbar"><button class="primary" id="exportBtn">تصدير نسخة احتياطية</button><label class="btn secondary" style="display:inline-block;cursor:pointer">استيراد نسخة JSON<input id="importFile" type="file" accept="application/json" style="display:none"></label></div>
+  <p class="muted">تنبيه: استيراد النسخة يستبدل البيانات الحالية في هذا المتصفح.</p>
+ </div>
+</section>
+</main>
+</div>
+<script>
+const KEY='autoshield_mvp_v1';
+const defaultServices=[
+ {id:crypto.randomUUID(),name:'PPF',price:0,notes:''},
+ {id:crypto.randomUUID(),name:'تظليل وعزل حراري',price:0,notes:''},
+ {id:crypto.randomUUID(),name:'نانو سيراميك',price:0,notes:''},
+ {id:crypto.randomUUID(),name:'حماية الفوانيس',price:0,notes:''},
+ {id:crypto.randomUUID(),name:'تنظيف وتلميع',price:0,notes:''}
+];
+let db=load();
+function load(){try{const x=JSON.parse(localStorage.getItem(KEY));if(x)return x}catch(e){}return {customers:[],vehicles:[],orders:[],services:defaultServices,products:[]}}
+function save(){localStorage.setItem(KEY,JSON.stringify(db));render()}
+function money(n){return (Number(n)||0).toLocaleString('ar-EG',{maximumFractionDigits:2})+' ج.م'}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function dateNow(){return new Date().toISOString().slice(0,10)}
+function customerName(id){return db.customers.find(x=>x.id===id)?.name||'—'}
+function vehicleLabel(id){const v=db.vehicles.find(x=>x.id===id);if(!v)return '—';return `${customerName(v.customerId)} — ${v.plate||'بدون لوحة'} — ${v.make||''} ${v.model||''}`}
+function serviceName(id){return db.services.find(x=>x.id===id)?.name||'خدمة محذوفة'}
+function table(headers,rows){if(!rows.length)return '<div class="empty">لا توجد بيانات حتى الآن</div>';return `<div class="tablewrap"><table><thead><tr>${headers.map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div>`}
+document.querySelectorAll('nav button').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('active',x===b));document.querySelectorAll('.section').forEach(x=>x.classList.toggle('active',x.id===b.dataset.page))}));
+document.getElementById('customerForm').addEventListener('submit',e=>{e.preventDefault();const f=new FormData(e.target),cid=crypto.randomUUID();db.customers.push({id:cid,name:f.get('name').trim(),phone:f.get('phone').trim(),createdAt:dateNow()});if(f.get('plate')||f.get('make')||f.get('model'))db.vehicles.push({id:crypto.randomUUID(),customerId:cid,plate:f.get('plate').trim(),make:f.get('make').trim(),model:f.get('model').trim(),color:f.get('color').trim()});e.target.reset();save()});
+document.getElementById('orderForm').addEventListener('submit',e=>{e.preventDefault();const f=new FormData(e.target),price=Number(f.get('price'))||0,deposit=Number(f.get('deposit'))||0;if(deposit>price){alert('العربون لا يمكن أن يتجاوز السعر المتفق عليه.');return}db.orders.push({id:crypto.randomUUID(),number:'AS-'+String(Date.now()).slice(-8),vehicleId:f.get('vehicleId'),serviceId:f.get('serviceId'),price,deposit,technician:f.get('technician').trim(),dueDate:f.get('dueDate'),status:f.get('status'),notes:f.get('notes').trim(),createdAt:dateNow()});e.target.reset();save()});
+document.getElementById('serviceForm').addEventListener('submit',e=>{e.preventDefault();const f=new FormData(e.target);db.services.push({id:crypto.randomUUID(),name:f.get('name').trim(),price:Number(f.get('price'))||0,notes:f.get('notes').trim()});e.target.reset();save()});
+document.getElementById('productForm').addEventListener('submit',e=>{e.preventDefault();const f=new FormData(e.target);db.products.push({id:crypto.randomUUID(),name:f.get('name').trim(),unit:f.get('unit'),qty:Number(f.get('qty'))||0,minQty:Number(f.get('minQty'))||0,cost:Number(f.get('cost'))||0});e.target.reset();save()});
+document.getElementById('exportBtn').addEventListener('click',()=>{const blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='autoshield-backup-'+dateNow()+'.json';a.click();URL.revokeObjectURL(a.href)});
+document.getElementById('importFile').addEventListener('change',async e=>{const file=e.target.files[0];if(!file)return;try{const x=JSON.parse(await file.text());if(!x.customers||!x.vehicles||!x.orders||!x.services||!x.products)throw Error();if(confirm('سيتم استبدال البيانات الحالية. هل تريد المتابعة؟')){db=x;save();alert('تم استيراد النسخة في هذا المتصفح.')}}catch(err){alert('الملف غير صالح أو لا يحتوي على بيانات AutoShield.')}e.target.value=''});
+function render(){
+ document.getElementById('statCustomers').textContent=db.customers.length;
+ document.getElementById('statVehicles').textContent=db.vehicles.length;
+ document.getElementById('statOrders').textContent=db.orders.length;
+ document.getElementById('statRevenue').textContent=money(db.orders.filter(o=>o.status!=='ملغي').reduce((s,o)=>s+o.price,0));
+ document.getElementById('vehicleSelect').innerHTML=db.vehicles.length?db.vehicles.map(v=>`<option value="${v.id}">${esc(vehicleLabel(v.id))}</option>`).join(''):'<option value="">أضف سيارة أولاً</option>';
+ document.getElementById('serviceSelect').innerHTML=db.services.map(s=>`<option value="${s.id}">${esc(s.name)} — ${money(s.price)}</option>`).join('');
+ document.getElementById('customersTable').innerHTML=table(['العميل','الهاتف','السيارات'],db.customers.map(c=>`<tr><td>${esc(c.name)}</td><td>${esc(c.phone)}</td><td>${db.vehicles.filter(v=>v.customerId===c.id).map(v=>esc((v.plate||'بدون لوحة')+' '+(v.make||'')+' '+(v.model||''))).join('<br>')||'—'}</td></tr>`));
+ const orderRows=db.orders.slice().reverse().map(o=>`<tr><td>${esc(o.number)}</td><td>${esc(vehicleLabel(o.vehicleId))}</td><td>${esc(serviceName(o.serviceId))}</td><td>${money(o.price)}</td><td>${money(o.deposit)}</td><td>${money(o.price-o.deposit)}</td><td><span class="pill">${esc(o.status)}</span></td><td>${esc(o.technician||'—')}</td><td>${esc(o.dueDate||'—')}</td><td class="no-print"><button class="secondary" onclick="printOrder('${o.id}')">طباعة</button></td></tr>`);
+ document.getElementById('ordersTable').innerHTML=table(['رقم الأمر','السيارة / العميل','الخدمة','الإجمالي','العربون','المتبقي','الحالة','الفني','التسليم',''],orderRows);
+ document.getElementById('recentOrders').innerHTML=table(['رقم الأمر','السيارة','الخدمة','الحالة','القيمة'],db.orders.slice(-5).reverse().map(o=>`<tr><td>${esc(o.number)}</td><td>${esc(vehicleLabel(o.vehicleId))}</td><td>${esc(serviceName(o.serviceId))}</td><td>${esc(o.status)}</td><td>${money(o.price)}</td></tr>`));
+ document.getElementById('servicesTable').innerHTML=table(['الخدمة','السعر الافتراضي','ملاحظات'],db.services.map(s=>`<tr><td>${esc(s.name)}</td><td>${money(s.price)}</td><td>${esc(s.notes||'—')}</td></tr>`));
+ document.getElementById('inventoryTable').innerHTML=table(['الصنف','الوحدة','الرصيد','حد التنبيه','تكلفة الوحدة','الحالة'],db.products.map(p=>`<tr><td>${esc(p.name)}</td><td>${esc(p.unit)}</td><td>${p.qty}</td><td>${p.minQty}</td><td>${money(p.cost)}</td><td>${p.qty<=p.minQty?'<span class="pill" style="background:#fff0df;color:#91531b">إعادة طلب</span>':'متاح'}</td></tr>`));
+}
+window.printOrder=function(id){const o=db.orders.find(x=>x.id===id);if(!o)return;const w=window.open('','_blank','width=800,height=700');if(!w){alert('اسمح بفتح النوافذ المنبثقة للطباعة.');return}w.document.write(`<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><title>أمر شغل ${esc(o.number)}</title><style>body{font-family:Tahoma,Arial;padding:25px;color:#182b38}h1{text-align:center}table{width:100%;border-collapse:collapse;margin-top:20px}td,th{border:1px solid #ccc;padding:10px;text-align:right}.foot{margin-top:35px;display:flex;justify-content:space-between}@media print{@page{margin:10mm}}</style><h1>AutoShield — أمر شغل</h1><p>رقم الأمر: ${esc(o.number)} | التاريخ: ${esc(o.createdAt)}</p><p>العميل / السيارة: ${esc(vehicleLabel(o.vehicleId))}</p><table><tr><th>الخدمة</th><th>الفني</th><th>الحالة</th><th>موعد التسليم</th></tr><tr><td>${esc(serviceName(o.serviceId))}</td><td>${esc(o.technician||'—')}</td><td>${esc(o.status)}</td><td>${esc(o.dueDate||'—')}</td></tr></table><table><tr><th>الإجمالي</th><th>العربون</th><th>المتبقي</th></tr><tr><td>${money(o.price)}</td><td>${money(o.deposit)}</td><td>${money(o.price-o.deposit)}</td></tr></table><p>ملاحظات: ${esc(o.notes||'—')}</p><div class="foot"><span>توقيع العميل: __________</span><span>توقيع الاستلام: __________</span></div><script>window.onload=()=>window.print()<\/script></html>`);w.document.close()};
+render();
+</script>
+</body>
+</html>
