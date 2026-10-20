@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Harx | إدارة محل حماية السيارات</title>
+<script>
+// ⬇️ حط بيانات مشروعك هنا (من Supabase → Project Settings → API). ده الـ anon key العام فقط، ومتحطش service_role أبداً.
+window.HARX_CONFIG={url:'PASTE_SUPABASE_URL',key:'PASTE_ANON_KEY'};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+(()=>{
+const C=window.HARX_CONFIG||{};let sb,me=null,prof=null,resolveReady;
+const ready=new Promise(r=>resolveReady=r),cache={},L={};
+const S='width:100%;padding:10px;margin:0 0 8px;border:1px solid #ccd;border-radius:8px;font:inherit;box-sizing:border-box';
+const B='padding:10px 14px;border:0;border-radius:8px;background:#0f9d9a;color:#fff;font:inherit;cursor:pointer;margin-inline-end:6px';
+function gate(h){let g=document.getElementById('hxg');if(!g){g=document.createElement('div');g.id='hxg';g.style.cssText='position:fixed;inset:0;z-index:99;background:#0d2a3a;align-items:center;justify-content:center;padding:16px;font-family:Tahoma,Arial,sans-serif;direction:rtl';document.body.appendChild(g)}
+ g.style.display=h?'flex':'none';if(h)g.innerHTML='<div style="background:#fff;color:#12212c;border-radius:14px;padding:20px;width:min(380px,100%)">'+h+'</div>'}
+const $=i=>document.getElementById(i);
+function login(msg){gate(`<h3 style="margin:0 0 12px">Harx</h3><input id="hxe" type="email" placeholder="الإيميل" style="${S}"><input id="hxp" type="password" placeholder="كلمة السر (8 أحرف على الأقل)" style="${S}"><input id="hxn" placeholder="الاسم (للحساب الجديد فقط)" style="${S}"><div id="hxm" style="color:#c0392b;min-height:20px;font-size:13px;margin-bottom:6px">${msg||''}</div><button id="hxi" style="${B}">دخول</button><button id="hxs" style="${B};background:#e9eff2;color:#234">حساب جديد</button>`);
+ const m=t=>$('hxm').textContent=t;
+ $('hxi').onclick=async()=>{const{error}=await sb.auth.signInWithPassword({email:$('hxe').value.trim(),password:$('hxp').value});error?m('بيانات الدخول غير صحيحة'):start()};
+ $('hxs').onclick=async()=>{const p=$('hxp').value;if(p.length<8)return m('كلمة السر 8 أحرف على الأقل');const{data,error}=await sb.auth.signUp({email:$('hxe').value.trim(),password:p,options:{data:{name:$('hxn').value.trim()}}});if(error)return m(error.message);data.session?start():m('تم إنشاء الحساب. أكّد الإيميل من الرسالة ثم ادخل.')}}
+async function start(){const{data:{session}}=await sb.auth.getSession();if(!session)return login();me=session.user;
+ const{data,error}=await sb.from('profiles').select('*').eq('id',me.id).single();if(error)return login('تعذّر تحميل الحساب: '+error.message);prof=data;
+ if(prof.role==='pending'){gate('<h3>تم تسجيل حسابك ✅</h3><p>بانتظار موافقة المالك لتفعيله.</p><button id="hxr" style="'+B+'">تحديث</button><button id="hxo" style="'+B+';background:#e9eff2;color:#234">خروج</button>');$('hxr').onclick=start;$('hxo').onclick=out;return}
+ gate('');bar();realtime();resolveReady()}
+const out=async()=>{await sb.auth.signOut();location.reload()};
+function bar(){if($('hxbar'))return;const d=document.createElement('div');d.id='hxbar';d.style.cssText='position:fixed;top:6px;left:6px;z-index:30;display:flex;gap:6px';
+ d.innerHTML='<button id="hxx" style="'+B+';padding:6px 10px;font-size:12px">خروج</button>'+(prof.role==='owner'?'<button id="hxb" style="'+B+';padding:6px 10px;font-size:12px;background:#0d2a3a">نسخة احتياطية</button>':'');document.body.appendChild(d);$('hxx').onclick=out;if($('hxb'))$('hxb').onclick=backup}
+async function backup(){const all=[];for(let f=0;;f+=1000){const{data,error}=await sb.from('docs').select('*').order('path').range(f,f+999);if(error)return alert(error.message);all.push(...data);if(data.length<1000)break}
+ const{data:pr}=await sb.from('profiles').select('*');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify({at:new Date().toISOString(),docs:all,profiles:pr})],{type:'application/json'}));a.download='harx-backup-'+new Date().toISOString().slice(0,10)+'.json';a.click()}
+const notify=k=>(L[k]||new Set()).forEach(f=>f());
+const listen=(k,f)=>{(L[k]=L[k]||new Set()).add(f);f()};
+function realtime(){sb.channel('hx').on('postgres_changes',{event:'*',schema:'public',table:'docs'},p=>{const r=p.new&&p.new.path?p.new:null,path=(r||p.old).path,i=path.indexOf('/'),k=path.slice(0,i),id=path.slice(i+1),m=cache[k];if(!m)return;p.eventType==='DELETE'?m.delete(id):m.set(id,r.data);notify(k)})
+ .on('postgres_changes',{event:'*',schema:'public',table:'profiles'},()=>notify('staff')).subscribe()}
+async function load(k){if(cache[k])return cache[k];const m=new Map();for(let f=0;;f+=1000){const{data,error}=await sb.from('docs').select('id,data').eq('coll',k).order('updated_at',{ascending:false}).range(f,f+999);if(error)throw error;data.forEach(r=>m.set(r.id,r.data));if(data.length<1000)break}return cache[k]=m}
+function snap(k,o){const a=[...cache[k].entries()].map(([id,d])=>({id,data:()=>d}));if(o)a.sort((x,y)=>{const p=x.data()[o.f]??'',q=y.data()[o.f]??'';return(p>q?1:p<q?-1:0)*(o.d==='desc'?-1:1)});return{docs:a}}
+async function staffSnap(){const{data}=await sb.from('profiles').select('id,name,role').in('role',['manager','reception','tech','viewer']);return{docs:(data||[]).map(r=>({id:r.id,data:()=>({role:r.role,name:r.name})}))}}
+const Q=(k,o)=>({doc:id=>D(k+'/'+id),orderBy:(f,d)=>Q(k,{f,d}),limit:()=>Q(k,o),
+ async get(){if(k==='staff')return staffSnap();await load(k);return snap(k,o)},
+ onSnapshot(cb,err){let on=1;(k==='staff'?Promise.resolve():load(k)).then(()=>listen(k,async()=>on&&cb(k==='staff'?await staffSnap():snap(k,o)))).catch(e=>err&&err(e));return()=>on=0}});
+const D=path=>{const i=path.indexOf('/'),k=path.slice(0,i),id=path.slice(i+1);return{
+ async set(v){if(k==='staff'){const{error}=await sb.from('profiles').update({role:v.role}).eq('id',id);if(error)throw error;return notify('staff')}
+  const{error}=await sb.from('docs').upsert({path,coll:k,id,data:v});if(error)throw error;if(cache[k]){cache[k].set(id,v);notify(k)}},
+ async delete(){if(k==='staff'){const{error}=await sb.from('profiles').update({role:'pending'}).eq('id',id);if(error)throw error;return notify('staff')}
+  const{error}=await sb.from('docs').delete().eq('path',path);if(error)throw error;if(cache[k]){cache[k].delete(id);notify(k)}},
+ onSnapshot(cb,err){if(k==='staff'){listen('staff',async()=>{const{data}=await sb.from('profiles').select('role,name').eq('id',id).maybeSingle();cb({exists:!!data,data:()=>data})});return()=>{}}
+  load(k).then(()=>listen(k,()=>{const m=cache[k];cb({exists:m.has(id),data:()=>m.get(id)})})).catch(e=>err&&err(e));return()=>{}}}};
+const DB={collection:k=>Q(k),doc:D};
+const U={id:async()=>me.id,isOwner:async()=>prof.role==='owner',canEdit:async()=>prof.role==='owner',me:async()=>({id:me.id,name:prof.name,isOwner:prof.role==='owner'}),
+ async profiles(ids){const{data}=await sb.from('profiles').select('id,name').in('id',ids);return Object.fromEntries((data||[]).map(p=>[p.id,{name:p.name}]))},
+ async search(q){const{data}=await sb.from('profiles').select('id,name').ilike('name','%'+String(q).replace(/[%_]/g,'')+'%').neq('role','owner').limit(10);return data||[]}};
+const A={upload:f=>new Promise((ok,no)=>{if(f.size>400000)return no(new Error('الصورة أكبر من 400KB'));const r=new FileReader();r.onload=()=>ok({url:r.result});r.onerror=no;r.readAsDataURL(f)})};
+window.claude={use:async n=>{await ready;return({db:DB,user:U,assets:A})[n]||null}};
+document.addEventListener('DOMContentLoaded',()=>{if(!C.url||/PASTE/.test(C.url+C.key)||!window.supabase)return gate('<h3>الإعداد ناقص</h3><p>افتح index.html وحط Project URL و anon key في أول الملف (راجع README).</p>');sb=window.supabase.createClient(C.url,C.key);start()});
+
+document.addEventListener('click',async e=>{if(e.target.id!=='hxadd')return;const v=i=>document.getElementById(i).value.trim(),m=document.getElementById('hxam'),say=t=>m.textContent=t;
+ const name=v('hxan'),email=v('hxae'),pw=document.getElementById('hxap').value,role=v('hxar');
+ if(!name||!email||pw.length<8)return say('اكتب الاسم والإيميل وكلمة سر 8 أحرف على الأقل');
+ if(!prof||prof.role!=='owner')return say('الإنشاء للمالك فقط');say('جاري الإنشاء...');
+ try{const t=window.supabase.createClient(C.url,C.key,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
+  const{data,error}=await t.auth.signUp({email,password:pw,options:{data:{name}}});if(error)return say(error.message);
+  const u=data&&data.user;if(!u)return say('تعذّر إنشاء الحساب');if(u.identities&&!u.identities.length)return say('الإيميل ده مسجّل قبل كده. ابحث عنه بالاسم تحت وفعّله.');
+  await new Promise(r=>setTimeout(r,700));
+  const{data:ok,error:e2}=await sb.from('profiles').update({role}).eq('id',u.id).select();
+  if(e2||!ok||!ok.length)return say('اتعمل الحساب لكن تفعيل الدور فشل. ابحث عنه بالاسم تحت وفعّله.');
+  notify('staff');['hxan','hxae','hxap'].forEach(i=>document.getElementById(i).value='');
+  say('✅ تم إنشاء حساب '+name+'. سلّمه الإيميل وكلمة السر.'+(data.session?'':' ⚠️ لازم يأكّد الإيميل من رسالة Supabase، أو اقفل Confirm email من إعدادات Authentication.'))}
+ catch(x){say('خطأ: '+(x.message||x))}});
+})();
+
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<style>
+:root{--bg:#f3f7f9;--card:#fff;--ink:#12212c;--mut:#62767f;--line:#dde6eb;--pri:#0f9d9a;--navy:#0d2a3a;--ok:#1a8f55;--bad:#c0392b;--soft:#e6f5f4;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0a141a;--card:#12222c;--ink:#e8f0f4;--mut:#93a8b2;--line:#24394a;--soft:#12363a;--navy:#06161f}}
+:root[data-theme="dark"]{--bg:#0a141a;--card:#12222c;--ink:#e8f0f4;--mut:#93a8b2;--line:#24394a;--soft:#12363a;--navy:#06161f}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:"Segoe UI",Tahoma,Arial,sans-serif;line-height:1.5}
+.hero{background:linear-gradient(135deg,var(--navy),#0f6f7c);color:#fff;padding:18px 16px 0;overflow:hidden}
+.hero .in{max-width:900px;margin:auto;display:flex;align-items:flex-end;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.brand b{font-size:28px;letter-spacing:1px}.brand small{display:block;opacity:.8;margin-top:2px}.hero svg.car{width:min(320px,70%);height:auto;margin-bottom:-2px}
+nav{max-width:900px;margin:auto;display:flex;gap:6px;padding:12px 16px 0;overflow-x:auto}nav button{flex:none;padding:11px 14px;white-space:nowrap;border:0;border-radius:10px 10px 0 0;background:transparent;color:#cfe;font:inherit;font-weight:600;cursor:pointer}nav button.on{background:var(--bg);color:var(--ink)}
+main{max-width:900px;margin:auto;padding:16px}.sec{display:none}.sec.on{display:block}
+.note{background:#fff4d6;color:#5a4300;border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:12px}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}@media(min-width:700px){.grid{grid-template-columns:repeat(4,1fr)}}
+.card,.inv{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}.card small{color:var(--mut)}.card b{display:block;font-size:19px;margin-top:4px}
+h2{font-size:18px;margin:18px 0 10px}label{display:block;font-size:13px;color:var(--mut);margin:0 0 4px}
+input,select,textarea{width:100%;font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px}
+.f2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}.f1{margin-bottom:10px}
+.svc{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:12px;padding:8px 10px;margin-bottom:8px;background:var(--card)}
+.svc.on{border-color:var(--pri);background:var(--soft)}.svc svg{width:26px;height:26px;color:var(--pri);flex:none}.svc span{flex:1}.svc input[type=checkbox]{width:20px;height:20px}.svc input[type=number]{width:110px}
+button.p,.btn{border:0;border-radius:10px;padding:11px 16px;background:var(--pri);color:#fff;font:inherit;font-weight:700;cursor:pointer}button.s{border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);padding:7px 10px;font:inherit;font-size:13px;cursor:pointer}button.wa{background:#1fa855;color:#fff;border:0}
+.total{display:flex;justify-content:space-between;font-size:18px;font-weight:700;padding:12px;background:var(--soft);border-radius:12px;margin:10px 0}
+.inv{margin-bottom:10px}.top{display:flex;justify-content:space-between;align-items:center}.mut{color:var(--mut);font-size:13px}.money{display:flex;justify-content:space-between;gap:6px;font-size:13px;margin:8px 0;flex-wrap:wrap}.due{color:var(--bad);font-weight:700}.ok{color:var(--ok);font-weight:700}
+.acts{display:flex;gap:6px;flex-wrap:wrap}.pill{font-size:12px;padding:3px 9px;border-radius:20px;background:var(--soft);color:var(--pri);font-weight:700}.pill.cancel{background:#fde8e6;color:var(--bad)}.pill.done{background:#e3f5ea;color:var(--ok)}
+.bar{height:8px;border-radius:6px;background:var(--line);margin:3px 0 9px;overflow:hidden}.bar i{display:block;height:100%;background:var(--pri)}
+#ov,#md{position:fixed;inset:0;background:#000a;display:none;overflow:auto;padding:14px;z-index:20}#ov.on,#md.on{display:block}
+.box{background:var(--card);border-radius:14px;padding:16px;max-width:520px;margin:6vh auto}
+.doc{background:#fff;color:#12212c;max-width:640px;margin:0 auto 14px;padding:22px;border-radius:12px}.doc table{width:100%;border-collapse:collapse;margin:10px 0}.doc td,.doc th{padding:7px;border-bottom:1px solid #dde6eb;text-align:right;font-size:14px}
+.cert{border:3px double #0f9d9a;text-align:center}.cert h1{margin:6px 0;color:#0d2a3a}.cert .terms{text-align:right;font-size:13px;color:#33474f;margin:12px 0}.sig{display:flex;justify-content:space-between;margin-top:26px;font-size:13px}
+.dtool{max-width:640px;margin:0 auto 12px;display:flex;gap:8px;flex-wrap:wrap}
+#toast{position:fixed;bottom:calc(16px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 16px;border-radius:10px;display:none;z-index:40;font-size:14px}#toast.bad{background:var(--bad)}
+#ov.t80 .doc{width:74mm;max-width:74mm;padding:2mm;font-size:12px}#ov.t58 .doc{width:52mm;max-width:52mm;padding:1mm;font-size:11px}#ov.t80 .doc td,#ov.t80 .doc th,#ov.t58 .doc td,#ov.t58 .doc th{font-size:11px;padding:3px}
+.cert2{position:relative;padding:26px;outline:3px solid #0f9d9a;outline-offset:-10px;box-shadow:inset 0 0 0 1px #0f9d9a;-webkit-print-color-adjust:exact;print-color-adjust:exact}.cert2 .hd{display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:2px solid #0f9d9a;padding-bottom:10px}.cert2 h1{text-align:center;color:#0d2a3a;margin:12px 0 2px;font-size:28px}.cert2 .orn{text-align:center;color:#0f9d9a;letter-spacing:6px}.cert2 ul{margin:4px 0;padding-inline-start:20px;font-size:12.5px;color:#33474f}.cert2 .ft{display:flex;justify-content:space-between;align-items:flex-end;margin-top:18px;gap:8px}.stp{width:120px;height:120px}
+@media print{body>*:not(#ov){display:none!important}#ov{position:static;background:none;padding:0;display:block}.dtool{display:none!important}.doc{border-radius:0;margin:0 auto}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute"><defs>
+<symbol id="i-ppf" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></symbol>
+<symbol id="i-tint" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 5h16v14H4z"/><path d="M8 15l5-6M12 17l5-6"/></symbol>
+<symbol id="i-ceramic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3s6 6.5 6 11a6 6 0 01-12 0c0-4.5 6-11 6-11z"/></symbol>
+<symbol id="i-lights" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3 12a9 7 0 019-7v14a9 7 0 01-9-7z"/><path d="M15 8h6M15 12h6M15 16h6"/></symbol>
+<symbol id="i-polish" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3l2 6 6 2-6 2-2 6-2-6-6-2 6-2z"/></symbol>
+<symbol id="shield" viewBox="0 0 24 24"><path d="M12 2l9 3v7c0 5.5-4 9-9 10-5-1-9-4.500-9-10V5z" fill="currentColor"/><path d="M8 12l3 3 5-6" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+<linearGradient id="hxg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#19d3c5"/><stop offset="1" stop-color="#0b6f7a"/></linearGradient>
+<symbol id="hx-mark" viewBox="0 0 48 52"><path d="M24 2L44 9V26C44 38 35.5 46 24 50C12.5 46 4 38 4 26V9Z" fill="url(#hxg)"/><path d="M24 2L44 9V20L4 34V9Z" fill="#fff" opacity=".13"/><path d="M16 15V37M32 15V37M16 26H32" fill="none" stroke="#fff" stroke-width="4.6" stroke-linejoin="round"/></symbol>
+<symbol id="hx-word" viewBox="0 0 152 56"><g fill="none" stroke="currentColor" stroke-width="7" stroke-linejoin="miter"><path d="M6 10V46M30 10V46M6 28H30"/><path d="M42 46L58 10L74 46M48.5 34H67.5"/><path d="M86 46V10H100a10 10 0 0 1 0 20H86M100 30L113 46"/><path d="M123 10L147 46"/><path d="M147 10L123 46" stroke="#19c6bd"/></g></symbol>
+</defs></svg>
+
+<header class="hero"><div class="in">
+ <div class="brand"><svg viewBox="0 0 218 56" width="190" role="img" aria-label="Harx" style="display:block;color:#fff"><use href="#hx-mark" x="0" y="2" width="46" height="50"/><use href="#hx-word" x="58" y="0" width="152" height="56"/></svg><small>حماية السيارات · PPF · نانو سيراميك · تظليل</small></div>
+ <svg class="car" viewBox="0 0 320 120" fill="none" aria-hidden="true">
+  <path d="M10 104h300" stroke="#ffffff55" stroke-width="2"/>
+  <path d="M22 92c0-16 18-22 46-28l30-24c8-6 20-9 34-9h58c14 0 26 5 36 14l22 20c22 2 40 8 42 26v6H22z" fill="#ffffff22" stroke="#fff" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M104 52l24-14h58c10 0 18 4 26 12l12 12H98z" fill="#ffffff33" stroke="#fff" stroke-width="1.5"/>
+  <path d="M120 60l16-22M160 60l14-22" stroke="#fff" stroke-opacity=".5" stroke-width="3"/>
+  <circle cx="84" cy="96" r="17" fill="#0d2a3a" stroke="#fff" stroke-width="2"/><circle cx="84" cy="96" r="7" fill="#fff" fill-opacity=".6"/>
+  <circle cx="246" cy="96" r="17" fill="#0d2a3a" stroke="#fff" stroke-width="2"/><circle cx="246" cy="96" r="7" fill="#fff" fill-opacity=".6"/>
+  <use href="#shield" x="226" y="2" width="44" height="44" style="color:#19d3c5"/>
+ </svg>
+</div>
+<nav><button class="on" data-t="home">الرئيسية</button><button data-t="new" data-need="new">فاتورة جديدة</button><button data-t="list">الفواتير</button><button data-t="rem" data-need="remind">تذكيرات</button><button data-t="rep" data-need="report">التقارير</button><button data-t="staff" data-need="settings">الموظفين</button><button data-t="set" data-need="settings">الإعدادات</button></nav></header>
+
+<main>
+<div id="sync" class="note" style="display:none">التخزين المشترك غير متاح في هذا العرض، فالبيانات هنا مؤقتة. افتح الصفحة من حسابك على claude.ai عشان تتحفظ وتظهر على كل الأجهزة.</div>
+
+<section id="home" class="sec on"><div class="grid" id="stats"></div><h2>المدفوعات حسب الطريقة</h2><div class="card" id="meth"></div><h2>آخر الفواتير</h2><div id="recent"></div></section>
+
+<section id="new" class="sec"><form id="f" autocomplete="off">
+ <div class="f2"><div><label>رقم الموبايل (واتساب) *</label><input id="ph" type="tel" inputmode="tel" required dir="ltr" placeholder="01012345678"></div><div><label>اسم العميل *</label><input id="nm" required></div></div>
+ <div class="f2"><div><label>رقم اللوحة</label><input id="pl"></div><div><label>السيارة (ماركة وموديل)</label><input id="cr" placeholder="Toyota Corolla"></div></div>
+ <h2>الخدمات</h2><div id="svc"></div>
+ <div class="f2"><div><label>خصم (ج.م)</label><input id="ds" type="number" min="0" step="0.01" value="0"></div><div><label>تاريخ الفاتورة</label><input id="dt" type="date" required></div></div>
+ <div class="total"><span>الإجمالي</span><span id="tt">٠ ج.م</span></div>
+ <div class="f2"><div><label>المدفوع الآن (ج.م)</label><input id="dp" type="number" min="0" step="0.01" value="0"></div><div><label>طريقة الدفع</label><select id="dm"></select></div></div>
+ <div class="f2"><div><label>مرجع العملية (رقم التحويل / آخر 4 أرقام)</label><input id="dr" dir="ltr"></div><div><label>رابط دفع إلكتروني (اختياري)</label><input id="lk" type="url" dir="ltr" placeholder="https://"></div></div>
+ <div class="f1"><label><input type="checkbox" id="wr" checked style="width:auto"> إصدار شهادة ضمان (المدة والشروط حسب سياسة كل خدمة)</label></div>
+ <div class="f1"><label>ملاحظات</label><textarea id="nt" rows="2"></textarea></div>
+ <button class="p" style="width:100%">حفظ الفاتورة</button></form></section>
+
+<section id="list" class="sec"><div class="f1"><input id="q" placeholder="بحث بالاسم / الموبايل / اللوحة / رقم الفاتورة"></div><div id="rows"></div></section>
+<section id="set" class="sec"><form id="sf" autocomplete="off"><h2>بيانات المحل</h2><div class="f2"><div><label>اسم المحل</label><input id="sn" placeholder="Harx"></div><div><label>تليفون المحل</label><input id="sp" dir="ltr"></div></div><div class="f1"><label>العنوان</label><input id="sa"></div><h2>الدفع الإلكتروني</h2><div class="f2"><div><label>عنوان إنستاباي (IPA)</label><input id="si" dir="ltr" placeholder="name@instapay"></div><div><label>رقم المحفظة (فودافون / أورانج / اتصالات / WE)</label><input id="sw" dir="ltr"></div></div><div class="f1"><label>حساب بنكي / IBAN</label><input id="sb" dir="ltr"></div><div class="note">البيانات دي بتظهر على الفاتورة وفي رسالة واتساب لما يكون على العميل متبقي. لو عايز العميل يدفع بالكارت أونلاين، اعمل رابط دفع من لوحة بوابة الدفع اللي هتتعاقد معاها والصقه في خانة «رابط دفع إلكتروني» في الفاتورة.</div><h2>الشعار</h2><div class="f1"><input id="lg" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml"></div><h2>سياسات الضمان</h2><div class="note">لكل خدمة مدة وشروط. عدّل واضغط حفظ. التعديل يسري على الفواتير الجديدة، والشهادات القديمة تحتفظ بشروطها وقت الإصدار. مدة 0 = بدون ضمان.</div><div id="pol"></div><div class="f1"><label>الشروط العامة (كل سطر شرط)</label><textarea id="sg" rows="6"></textarea></div><button class="p">حفظ الإعدادات</button></form></section>
+<section id="rem" class="sec"><div class="note">رسائل واتساب جاهزة: ضمان قرب ينتهي، وصيانة دورية بعد 6 شهور من التسليم.</div><div id="reml"></div></section>
+<section id="rep" class="sec"><div class="f1"><label>الشهر</label><input id="rm" type="month"></div><div id="repo"></div></section>
+<section id="staff" class="sec"><div class="note">أنشئ حساب الموظف من هنا وسلّمه الإيميل وكلمة السر المؤقتة. يدخل بيهم من نفس رابط النظام. الدور بيحدد الأزرار والتبويبات اللي بتظهر له.</div><div class="card" style="margin-bottom:12px"><h3>إنشاء حساب موظف</h3><div class="f2"><div><label>الاسم</label><input id="hxan"></div><div><label>الإيميل</label><input id="hxae" type="email" dir="ltr"></div></div><div class="f2"><div><label>كلمة سر مؤقتة (8 أحرف+)</label><input id="hxap" dir="ltr"></div><div><label>الدور</label><select id="hxar"><option value="reception">استقبال</option><option value="tech">فني</option><option value="manager">مدير</option><option value="viewer">مشاهدة فقط</option></select></div></div><div id="hxam" style="min-height:20px;font-size:13px;color:#c0392b;margin-bottom:8px"></div><button class="p" id="hxadd" type="button">إنشاء الحساب</button></div><div class="f1"><label>أو فعّل حساب سجّل بنفسه (ابحث بالاسم)</label><input id="sq"></div><div id="sqr" class="acts"></div><h2>الموظفين الحاليين</h2><div id="stl"></div><div class="card mut" style="font-size:13px;margin-top:10px">مالك: كل شيء · مدير: فواتير ودفعات وتقارير وتذكيرات · استقبال: فواتير ودفعات وواتساب · فني: تغيير الحالة والعرض · مشاهدة: عرض فقط. «حذف» بيقفل وصول الموظف فوراً.</div></section>
+</main>
+<div id="ov"></div><div id="md"></div><div id="toast"></div>
+
+<script>
+const SV=[['ppf','PPF حماية الطلاء'],['tint','تظليل وعزل حراري'],['ceramic','نانو سيراميك'],['lights','حماية الفوانيس'],['polish','تنظيف وتلميع']];
+const ME={cash:'كاش',card:'فيزا / ماستركارد',instapay:'إنستاباي',vcash:'فودافون كاش',orange:'أورانج كاش',etisalat:'اتصالات كاش',wepay:'WE Pay',bank:'تحويل بنكي'};
+const PP=[['a4','A4 (ورق عادي)'],['t80','إيصال حراري 80مم'],['t58','إيصال حراري 58مم']];
+const ST={new:'استلام جديد',work:'جاري التنفيذ',ready:'جاهز للتسليم',done:'تم التسليم',cancel:'ملغي'};
+const TERMS=['الضمان سنة كاملة من تاريخ الفاتورة، ويغطي عيوب التركيب والخامة مثل التقشر والفقاعات والاصفرار.','لا يشمل الضمان الحوادث والصدمات والخدوش والاستخدام الخاطئ أو التعديل عند جهة أخرى.','يلزم إحضار هذه الشهادة أو رقم الفاتورة عند طلب الضمان.','الالتزام بتعليمات العناية والصيانة الدورية شرط لسريان الضمان.'];
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const r2=n=>Math.round((+n||0)*100)/100,EGP=n=>r2(n).toLocaleString('ar-EG')+' ج.م';
+const today=()=>new Date().toLocaleDateString('en-CA');
+const fd=d=>new Date(d+'T00:00:00').toLocaleDateString('ar-EG',{year:'numeric',month:'long',day:'numeric'});
+const endW=(d,m=12)=>{const x=new Date(d+'T00:00:00');x.setMonth(x.getMonth()+m);return x.toLocaleDateString('en-CA')};
+const tot=o=>Math.max(0,r2(o.items.reduce((s,i)=>s+i.p,0)-(o.disc||0))),pd=o=>r2((o.pay||[]).reduce((s,p)=>s+p.a,0)),due=o=>r2(tot(o)-pd(o));
+const phn=p=>{let d=String(p||'').replace(/[٠-٩]/g,x=>'٠١٢٣٤٥٦٧٨٩'.indexOf(x)).replace(/\D/g,'');if(d.startsWith('00'))d=d.slice(2);if(d.startsWith('0'))d='20'+d.slice(1);return d};
+// ===== أدوار الموظفين: عدّل القوائم هنا بسهولة =====
+const ROLES={owner:'مالك',manager:'مدير',reception:'استقبال',tech:'فني',viewer:'مشاهدة فقط'};
+const PERM={owner:['*'],manager:['new','pay','status','wa','remind','report'],reception:['new','pay','wa'],tech:['status'],viewer:[]};
+// ===== سياسات الضمان الافتراضية (تتعدل من الإعدادات) =====
+const DEF_POL={
+ppf:{m:12,t:['ضمان ضد الاصفرار والتقشر والتشقق وانفصال الحواف الناتج عن عيب في الخامة أو التركيب.','يُمنع غسيل السيارة 7 أيام من التركيب، ويُمنع الغسيل بالضغط العالي القريب من الحواف.','لا يشمل الضمان الخدوش العميقة والصدمات والحوادث أو الصيانة عند جهة أخرى.','يُغسل بشامبو متعادل، ولا يُستخدم التلميع الكاشط على الفيلم.'].join('\n')},
+tint:{m:12,t:['ضمان ضد الفقاعات والتقشر وتغيّر اللون وبهتان الفيلم.','لا تُفتح النوافذ 3 أيام من التركيب، وقد تظهر رطوبة بسيطة تزول خلال أسابيع وهذا طبيعي.','لا يشمل الخدوش الناتجة عن الاستخدام أو لصق ملصقات أو التنظيف بمواد تحتوي على نشادر.'].join('\n')},
+ceramic:{m:12,t:['ضمان على تماسك الطبقة وعدم تقشرها أو تشققها.','الطبقة تقلل التأثر بالعوامل الجوية والأوساخ ولا تمنع الخدوش.','لا تُغسل السيارة 7 أيام من التنفيذ، ويُفضّل تجنب المطر أول 48 ساعة.','الغسيل الدوري المناسب كل 3 شهور شرط لسريان الضمان.','لا يشمل الضمان الخدوش والصدمات أو الحاجة للتلميع أو آثار المواد الكيميائية الحادة.'].join('\n')},
+lights:{m:12,t:['ضمان ضد اصفرار وتقشر وتشقق الطبقة الواقية للفوانيس.','يُمنع الغسيل 48 ساعة بعد التنفيذ.','لا يشمل التلف الناتج عن الحوادث أو التنظيف بمواد كاشطة أو الحرارة غير الطبيعية.'].join('\n')},
+polish:{m:0,t:'خدمة تحسينية ولا يوجد عليها ضمان.'}};
+const DEF_GEN=['يبدأ الضمان من تاريخ الفاتورة.','يلزم إحضار هذه الشهادة أو ذكر رقم الفاتورة عند طلب الضمان.','الضمان خاص بالسيارة المذكورة، وغير قابل للتحويل أو الاستبدال نقداً.','يحق للمحل فحص السيارة قبل قبول طلب الضمان، ويقتصر الضمان على إصلاح أو استبدال الجزء المعيب.','يسقط الضمان عند ثبوت سوء الاستخدام أو التعديل أو الإصلاح عند جهة أخرى.'].join('\n');
+let ROLE='viewer',ID=null,UP=null,DBH=null,STAFF=[],DBC=null,SD=null,SET={},inv=[],curKind='inv',paper=(()=>{try{return localStorage.getItem('paper')||'a4'}catch{return'a4'}})();
+function toast(m,bad){const t=$('#toast');t.textContent=m;t.className=bad?'bad':'';t.style.display='block';clearTimeout(t._t);t._t=setTimeout(()=>t.style.display='none',3200)}
+function put(o){if(DBC)return DBC.doc(o.id).set(o).catch(e=>toast('تعذّر الحفظ: '+(e.message||e.code),1));const i=inv.findIndex(x=>x.id===o.id);i<0?inv.unshift(o):inv[i]=o;render()}
+(async()=>{try{const db=await claude.use('db');if(!db)throw 0;DBC=db.collection('invoices');SD=db.doc('settings/main');SD.onSnapshot(s=>{SET=s.data()||{};fillSet()});initUsers(db);DBC.orderBy('created','desc').limit(500).onSnapshot(s=>{inv=s.docs.map(d=>d.data());render()},()=>toast('تعذّر تحميل البيانات',1))}catch(e){$('#sync').style.display='block';ROLE='owner';setTimeout(applyRole,0);render()}})();
+// tabs
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));document.querySelectorAll('.sec').forEach(x=>x.classList.toggle('on',x.id===b.dataset.t))});
+const go=t=>document.querySelector(`nav [data-t=${t}]`).click();
+// form
+$('#dm').innerHTML=Object.entries(ME).map(([k,v])=>`<option value="${k}">${v}</option>`).join('');$('#dt').value=today();
+$('#svc').innerHTML=SV.map(([k,n])=>`<div class="svc" id="r-${k}"><input type="checkbox" id="c-${k}"><svg><use href="#i-${k}"/></svg><span>${n}</span><input type="number" id="p-${k}" min="0" step="0.01" placeholder="السعر" disabled></div>`).join('');
+const items=()=>SV.filter(([k])=>$('#c-'+k).checked).map(([k,n])=>({k,n,p:r2($('#p-'+k).value),m:pol(k).m,t:pol(k).t}));
+function calc(){const t=Math.max(0,r2(items().reduce((s,i)=>s+i.p,0)-(+$('#ds').value||0)));$('#tt').textContent=EGP(t);return t}
+SV.forEach(([k])=>{$('#c-'+k).onchange=e=>{$('#p-'+k).disabled=!e.target.checked;$('#r-'+k).classList.toggle('on',e.target.checked);calc()};$('#p-'+k).oninput=calc});$('#ds').oninput=calc;
+$('#ph').oninput=()=>{const p=phn($('#ph').value);if(p.length<11)return;const o=inv.find(x=>phn(x.phone)===p);if(!o)return;if(!$('#nm').value)$('#nm').value=o.name;if(!$('#pl').value)$('#pl').value=o.plate||'';if(!$('#cr').value)$('#cr').value=o.car||''};
+$('#f').onsubmit=async e=>{e.preventDefault();const it=items(),t=calc(),dp=r2($('#dp').value);
+ if(!it.length)return toast('اختار خدمة واحدة على الأقل',1);if(it.some(i=>i.p<=0))return toast('اكتب سعر كل خدمة مختارة',1);
+ if(phn($('#ph').value).length<11)return toast('رقم الموبايل غير صالح',1);if(dp<0||dp>t)return toast('المدفوع لازم يكون بين صفر والإجمالي',1);
+ const no='AR-'+Date.now().toString(36).toUpperCase().slice(-6),d=$('#dt').value||today();
+ const o={id:no,no,date:d,name:$('#nm').value.trim(),phone:$('#ph').value.trim(),plate:$('#pl').value.trim(),car:$('#cr').value.trim(),items:it,disc:r2($('#ds').value),pay:dp>0?[{a:dp,m:$('#dm').value,d,r:$('#dr').value.trim()}]:[],lk:$('#lk').value.trim(),wr:$('#wr').checked,st:'new',note:$('#nt').value.trim(),created:new Date().toISOString()};
+ await put(o);e.target.reset();$('#dt').value=today();document.querySelectorAll('.svc').forEach(x=>x.classList.remove('on'));SV.forEach(([k])=>$('#p-'+k).disabled=true);calc();toast('تم حفظ الفاتورة '+no);go('list');showDoc(no,'inv')};
+// render
+const stc=s=>s==='cancel'||s==='done'?s:'';
+function row(o){const dd=due(o);return`<div class="inv"><div class="top"><b>${esc(o.no)}</b><span class="pill ${stc(o.st)}">${ST[o.st]}</span></div><div>${esc(o.name)} · <span dir="ltr">${esc(o.phone)}</span></div><div class="mut">${esc(o.car)} ${esc(o.plate)} · ${fd(o.date)}</div><div class="mut">${o.items.map(i=>esc(i.n)).join('، ')}</div><div class="money"><span>الإجمالي ${EGP(tot(o))}</span><span>المدفوع ${EGP(pd(o))}</span><span class="${dd>0?'due':'ok'}">المتبقي ${EGP(dd)}</span></div><div class="acts"><button class="s" data-a="inv" data-i="${esc(o.id)}">الفاتورة</button><button class="s wa" data-a="wa" data-i="${esc(o.id)}">واتساب</button>${dd>0&&o.st!=='cancel'?`<button class="s" data-a="pay" data-i="${esc(o.id)}">+ دفعة</button>`:''}<button class="s" data-a="st" data-i="${esc(o.id)}">الحالة</button>${o.wr?`<button class="s" data-a="war" data-i="${esc(o.id)}">شهادة الضمان</button>`:''}</div></div>`}
+function render(){const t=today(),act=inv.filter(o=>o.st!=='cancel');
+ const todayIn=r2(inv.reduce((s,o)=>s+(o.pay||[]).filter(p=>p.d===t).reduce((a,p)=>a+p.a,0),0));
+ const st=[['محصّل اليوم',EGP(todayIn)],['المتبقي عند العملاء',EGP(act.reduce((s,o)=>s+due(o),0))],['شغل جاري',act.filter(o=>['new','work','ready'].includes(o.st)).length],['ضمانات سارية',act.filter(o=>o.wr&&wEnd(o)&&wEnd(o)>=t).length]];
+ $('#stats').innerHTML=st.map(([l,v])=>`<div class="card"><small>${l}</small><b>${v}</b></div>`).join('');
+ const m={};inv.forEach(o=>(o.pay||[]).forEach(p=>m[p.m]=r2((m[p.m]||0)+p.a)));const mx=Math.max(1,...Object.values(m));
+ $('#meth').innerHTML=Object.keys(m).length?Object.entries(ME).map(([k,n])=>`<div style="display:flex;justify-content:space-between;font-size:14px"><span>${n}</span><b>${EGP(m[k]||0)}</b></div><div class="bar"><i style="width:${(m[k]||0)/mx*100}%"></i></div>`).join(''):'<span class="mut">لا توجد مدفوعات بعد</span>';
+ $('#recent').innerHTML=inv.slice(0,5).map(row).join('')||'<div class="card mut">ابدأ بإنشاء أول فاتورة من تبويب «فاتورة جديدة».</div>';
+ const q=$('#q').value.trim().toLowerCase();
+ $('#rows').innerHTML=inv.filter(o=>!q||(o.no+o.name+o.phone+o.plate).toLowerCase().includes(q)).map(row).join('')||'<div class="card mut">لا توجد فواتير.</div>'}
+$('#q').oninput=render;
+function fillSet(){const f=$('#sf');if(f.contains(document.activeElement))return;[['sn','sn'],['sp','sp'],['sa','sa'],['si','ip'],['sw','wl'],['sb','bk']].forEach(([i,k])=>$('#'+i).value=SET[k]||'');$('#sg').value=SET.gen??DEF_GEN;$('#pol').innerHTML=SV.map(([k,n])=>`<div class="card" style="margin-bottom:8px"><b>${n}</b><div class="f1" style="margin-top:8px"><label>مدة الضمان (شهور، 0 = بدون ضمان)</label><input id="pm-${k}" type="number" min="0" value="${pol(k).m}"></div><label>شروط الخدمة (كل سطر شرط)</label><textarea id="pt-${k}" rows="4">${esc(pol(k).t)}</textarea></div>`).join('')}
+$('#sf').onsubmit=e=>{e.preventDefault();const v={...SET,pol:readPol(),gen:$('#sg').value,sn:$('#sn').value.trim(),sp:$('#sp').value.trim(),sa:$('#sa').value.trim(),ip:$('#si').value.trim(),wl:$('#sw').value.trim(),bk:$('#sb').value.trim()};SET=v;if(SD)SD.set(v).then(()=>toast('تم حفظ الإعدادات')).catch(()=>toast('تعذّر الحفظ',1));else toast('تم الحفظ مؤقتاً')};
+function payInfo(o){const s=SET,L=[];if(due(o)>0&&o.st!=='cancel'){if(s.ip)L.push('إنستاباي: '+s.ip);if(s.wl)L.push('محفظة إلكترونية: '+s.wl);if(s.bk)L.push('تحويل بنكي: '+s.bk);if(o.lk)L.push('رابط الدفع: '+o.lk)}return L.length?'\nلسداد المتبقي:\n'+L.join('\n')+'\n':''}
+const can=a=>{const p=PERM[ROLE]||[];return p.includes('*')||p.includes(a)};
+function applyRole(){document.querySelectorAll('nav button[data-need]').forEach(b=>b.style.display=can(b.dataset.need)?'':'none');const on=document.querySelector('nav button.on');if(on&&on.style.display==='none')go('home')}
+const pol=k=>({...(DEF_POL[k]||{m:12,t:''}),...((SET.pol||{})[k]||{})});
+const kOf=i=>i.k||(SV.find(s=>s[1]===i.n)||[])[0];
+const iM=i=>i.m??pol(kOf(i)).m,iT=i=>String(i.t??pol(kOf(i)).t);
+const wEnd=o=>{const m=Math.max(0,...o.items.map(iM));return m?endW(o.date,m):null};
+function readPol(){const o={};SV.forEach(([k])=>o[k]={m:Math.max(0,parseInt($('#pm-'+k).value)||0),t:$('#pt-'+k).value});return o}
+async function initUsers(db){DBH=db;try{UP=await claude.use('user');if(!UP)return;ID=await UP.id();if((await UP.isOwner())||(await UP.canEdit())){ROLE='owner';applyRole();db.collection('staff').onSnapshot(s=>{STAFF=s.docs.map(d=>({id:d.id,...d.data()}));renderStaff()})}else db.doc('staff/'+ID).onSnapshot(s=>{ROLE=s.exists?s.data().role:'viewer';applyRole();render()})}catch(e){}}
+async function renderStaff(){let pf={};try{if(STAFF.length)pf=await UP.profiles(STAFF.map(s=>s.id))}catch{}$('#stl').innerHTML=STAFF.map(s=>`<div class="inv top"><span>${esc((pf[s.id]||{}).name||'موظف')}</span><span><select data-st="${esc(s.id)}" style="width:auto">${Object.entries(ROLES).filter(([k])=>k!=='owner').map(([k,v])=>`<option value="${k}"${k===s.role?' selected':''}>${v}</option>`).join('')}</select> <button class="s" data-a="rmst" data-i="${esc(s.id)}">حذف</button></span></div>`).join('')||'<div class="card mut">لا يوجد موظفون بعد.</div>'}
+$('#sq').oninput=async e=>{const v=e.target.value.trim();if(!UP||!v){$('#sqr').innerHTML='';return}try{const r=await UP.search(v);$('#sqr').innerHTML=(r||[]).map(h=>`<button class="s" data-a="addst" data-i="${esc(h.id)}">${esc(h.name||'—')} +</button>`).join('')||'<span class="mut">لا نتائج</span>'}catch{}};
+document.addEventListener('change',e=>{const s=e.target.dataset&&e.target.dataset.st;if(s&&DBH)DBH.doc('staff/'+s).set({role:e.target.value})});
+$('#lg').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const A=await claude.use('assets');if(!A)return toast('رفع الملفات غير متاح لك',1);const r=await A.upload(f);SET={...SET,logo:r.url};if(SD)await SD.set(SET);toast('تم رفع الشعار');fillSet()}catch(x){toast('تعذّر رفع الشعار',1)}};
+function qr(t){try{const q=qrcode(0,'M');q.addData(t);q.make();return q.createSvgTag({cellSize:3,margin:0,scalable:true})}catch{return''}}
+function stamp(o){return`<svg class="stp" viewBox="0 0 120 120" style="transform:rotate(-12deg)"><g fill="none" stroke="#0b5f8a" opacity=".85"><circle cx="60" cy="60" r="56" stroke-width="3"/><circle cx="60" cy="60" r="49" stroke-width="1"/></g><g fill="#0b5f8a" opacity=".85" text-anchor="middle"><text x="60" y="40" font-size="10" font-weight="700">ضمان معتمد</text><text x="60" y="62" font-size="12" font-weight="700">${esc(SET.sn||'Harx')}</text><text x="60" y="80" font-size="9">${esc(SET.sp||'')}</text><text x="60" y="96" font-size="9">${esc(o.date.slice(0,4))}</text></g></svg>`}
+function certHtml(o){const cv=o.items.filter(i=>iM(i)>0);if(!cv.length)return'<div class="doc">لا توجد خدمات مشمولة بالضمان في هذه الفاتورة.</div>';
+ const lg=SET.logo?`<img src="${esc(SET.logo)}" alt="" style="height:66px;max-width:170px;object-fit:contain">`:`<svg width="60" height="65" viewBox="0 0 48 52"><use href="#hx-mark"/></svg>`;
+ const nm=esc(SET.sn||'Harx'),rows=cv.map(i=>`<tr><td>${esc(i.n)}</td><td>${iM(i)} شهر</td><td>${fd(endW(o.date,iM(i)))}</td></tr>`).join('');
+ const tl=cv.map(i=>`<div style="margin-top:6px"><b style="font-size:13px">${esc(i.n)}</b><ul>${iT(i).split('\n').filter(Boolean).map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`).join('');
+ const gen=String(SET.gen??DEF_GEN).split('\n').filter(Boolean).map(x=>`<li>${esc(x)}</li>`).join('');
+ return`<div class="doc cert2"><div class="hd">${lg}<div style="text-align:left;font-size:12px;color:#33474f"><b style="font-size:16px;color:#0d2a3a">${nm}</b><br>${esc([SET.sp,SET.sa].filter(Boolean).join(' · '))}</div></div><h1>شهادة ضمان</h1><div class="orn">◆ ◆ ◆</div><p style="text-align:center;margin:6px 0">رقم الشهادة <b>W-${esc(o.no)}</b> · تاريخ الإصدار <b>${fd(o.date)}</b></p><p style="font-size:14px">تشهد ${nm} بأن السيارة <b>${esc(o.car)} ${esc(o.plate)}</b> المملوكة للسيد/ة <b>${esc(o.name)}</b> تم تنفيذ الخدمات التالية عليها، وهي مشمولة بالضمان وفق الشروط الموضحة:</p><table><tr><th>الخدمة</th><th>مدة الضمان</th><th>ينتهي في</th></tr>${rows}</table>${tl}<div style="margin-top:8px"><b style="font-size:13px">شروط عامة</b><ul>${gen}</ul></div><div class="ft"><div style="width:84px">${qr('Harx|W-'+o.no+'|'+wEnd(o))}<div style="font-size:9px;color:#62767f;text-align:center">رمز التحقق</div></div>${stamp(o)}<div style="font-size:12px;text-align:center">توقيع المحل<br><br>____________<br>توقيع العميل<br><br>____________</div></div></div>`}
+function waTo(p,t){const a=document.createElement('a');a.href=`https://wa.me/${phn(p)}?text=${encodeURIComponent(t)}`;a.target='_blank';a.rel='noopener';document.body.appendChild(a);a.click();a.remove()}
+const dayd=(a,b)=>Math.round((new Date(a+'T00:00:00')-new Date(b+'T00:00:00'))/864e5);
+function remList(){const t=today(),L=[];inv.forEach(o=>{if(o.st==='cancel'||!o.wr)return;const e=wEnd(o);if(e&&!o.r1){const d=dayd(e,t);if(d<=30&&d>=-14)L.push({o,k:'r1',lbl:'الضمان ينتهي '+fd(e),txt:`ضمان سيارتك ${o.car} هينتهي في ${fd(e)}. تعالى نعمل لها فحص مجاني قبل ما ينتهي.`})}if(o.st==='done'&&!o.r2){const d=dayd(t,endW(o.date,6));if(d>=-7&&d<=30)L.push({o,k:'r2',lbl:'صيانة دورية بعد 6 شهور',txt:`عدّى 6 شهور على ${o.items.map(i=>i.n).join(' و')} لسيارتك ${o.car}. نحب نطمّن عليها ونعمل صيانة وفحص دوري.`})}});return L}
+function renderRem(){$('#reml').innerHTML=remList().map(x=>`<div class="inv"><div class="top"><b>${esc(x.o.name)}</b><span class="pill">${esc(x.lbl)}</span></div><div class="mut">${esc(x.o.car)} ${esc(x.o.plate)} · <span dir="ltr">${esc(x.o.phone)}</span></div><div class="acts" style="margin-top:8px"><button class="s wa" data-a="rem" data-i="${esc(x.o.id)}" data-k="${x.k}">إرسال واتساب</button></div></div>`).join('')||'<div class="card mut">لا توجد تذكيرات حالياً.</div>'}
+function renderRep(){const m=$('#rm').value||today().slice(0,7);let c=0,n=0,b=0;const bm={},bs={};inv.forEach(o=>{(o.pay||[]).forEach(p=>{if((p.d||'').startsWith(m)){c+=p.a;bm[p.m]=(bm[p.m]||0)+p.a}});if(o.date.startsWith(m)&&o.st!=='cancel'){n++;b+=tot(o);o.items.forEach(i=>bs[i.n]=(bs[i.n]||0)+i.p)}});const li=(O,f)=>Object.entries(O).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<div style="display:flex;justify-content:space-between;font-size:14px;padding:3px 0"><span>${esc(f(k))}</span><b>${EGP(v)}</b></div>`).join('')||'<span class="mut">لا يوجد</span>';$('#repo').innerHTML=`<div class="grid"><div class="card"><small>المحصّل</small><b>${EGP(c)}</b></div><div class="card"><small>قيمة الفواتير</small><b>${EGP(b)}</b></div><div class="card"><small>عدد الفواتير</small><b>${n}</b></div><div class="card"><small>متوسط الفاتورة</small><b>${EGP(n?b/n:0)}</b></div></div><h2>حسب طريقة الدفع</h2><div class="card">${li(bm,k=>ME[k]||k)}</div><h2>حسب الخدمة</h2><div class="card">${li(bs,k=>k)}</div>`}
+$('#rm').value=today().slice(0,7);$('#rm').onchange=renderRep;
+{const _r=render;render=()=>{_r();renderRep();renderRem()}}
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-a]');if(!b)return;const a=b.dataset.a,i=b.dataset.i;if(a==='addst'&&DBH){await DBH.doc('staff/'+i).set({role:'reception'});$('#sq').value='';$('#sqr').innerHTML='';toast('تمت الإضافة. اختار دوره من القائمة')}else if(a==='rmst'&&DBH&&confirm('حذف الموظف؟'))DBH.doc('staff/'+i).delete();else if(a==='rem'){const x=remList().find(z=>z.o.id===i&&z.k===b.dataset.k);if(!x)return;waTo(x.o.phone,`أهلاً ${x.o.name} 👋\n${x.txt}\n${SET.sn||'Harx'}`);put({...x.o,[x.k]:true})}});
+fillSet();
+function doPrint(){const p=curKind==='war'?'a4':paper,sz={a4:'A4;margin:10mm',t80:'80mm auto;margin:3mm',t58:'58mm auto;margin:2mm'}[p];let s=$('#pgs');if(!s){s=document.createElement('style');s.id='pgs';document.head.appendChild(s)}s.textContent='@media print{@page{size:'+sz+'}}';window.print()}
+document.addEventListener('change',e=>{if(e.target.id==='pp'){paper=e.target.value;try{localStorage.setItem('paper',paper)}catch{}if(curKind!=='war')$('#ov').className='on '+paper}});
+// docs
+function msg(o){return`أهلاً ${o.name} 👋\nفاتورتك من Harx\nرقم الفاتورة: ${o.no}\nالتاريخ: ${fd(o.date)}\nالسيارة: ${o.car} ${o.plate}\n\nالخدمات:\n${o.items.map(i=>`- ${i.n}: ${EGP(i.p)}`).join('\n')}\n${o.disc?`الخصم: ${EGP(o.disc)}\n`:''}الإجمالي: ${EGP(tot(o))}\nالمدفوع: ${EGP(pd(o))}\nالمتبقي: ${EGP(due(o))}\n${o.wr&&wEnd(o)?`\n🛡️ ضمان من ${fd(o.date)} حتى ${fd(wEnd(o))}\n`:''}${payInfo(o)}\nشكراً لثقتك بنا.`}
+function wa(o){const a=document.createElement('a');a.href=`https://wa.me/${phn(o.phone)}?text=${encodeURIComponent(msg(o))}`;a.target='_blank';a.rel='noopener';document.body.appendChild(a);a.click();a.remove()}
+const head=()=>`<div style="display:flex;align-items:center;gap:8px;color:#0d2a3a"><svg width="38" height="41" viewBox="0 0 48 52"><use href="#hx-mark"/></svg><div><b style="font-size:20px">${esc(SET.sn||'Harx')}</b><div style="font-size:12px;color:#62767f">${esc([SET.sp,SET.sa].filter(Boolean).join(' · ')||'حماية السيارات')}</div></div></div>`;
+function showDoc(id,kind){const o=inv.find(x=>x.id===id);if(!o)return;const ov=$('#ov');
+ const tools=`<div class="dtool"><select id="pp" style="width:auto" title="مقاس الورق">${PP.map(([k,v])=>`<option value="${k}"${k===paper?' selected':''}>${v}</option>`).join('')}</select><button class="p" data-a="prn">طباعة / حفظ PDF</button><button class="btn wa" data-a="wa" data-i="${esc(o.id)}">إرسال واتساب</button><button class="s" data-a="x">إغلاق</button></div><div class="dtool" style="color:#cfe;font-size:12px">اختار الطابعة من نافذة الطباعة اللي هتفتح، والمتصفح بيفتكر آخر طابعة استخدمتها. شهادة الضمان بتطبع دايماً على A4.</div>`;
+ const d=kind==='war'?certHtml(o):kind==='x'?`<div class="doc cert">${head()}<svg width="70" height="70" style="color:#0f9d9a;margin-top:8px"><use href="#shield"/></svg><h1>شهادة ضمان</h1><div>رقم الشهادة: <b>W-${esc(o.no)}</b></div><p>تشهد Harx بأن السيارة <b>${esc(o.car)} ${esc(o.plate)}</b> الخاصة بالسيد/ة <b>${esc(o.name)}</b> تم تنفيذ الخدمات التالية عليها وهي مشمولة بالضمان:</p><p><b>${o.items.map(i=>esc(i.n)).join(' · ')}</b></p><table><tr><th>بداية الضمان (تاريخ الفاتورة)</th><th>نهاية الضمان</th></tr><tr><td>${fd(o.date)}</td><td>${fd(endW(o.date))}</td></tr></table><div class="terms"><b>شروط الضمان:</b><ol>${TERMS.map(x=>`<li>${x}</li>`).join('')}</ol></div><div class="sig"><span>ختم وتوقيع المحل: ________</span><span>توقيع العميل: ________</span></div></div>`
+ :`<div class="doc">${head()}<div style="display:flex;justify-content:space-between;margin-top:12px;font-size:14px"><span>فاتورة رقم <b>${esc(o.no)}</b></span><span>${fd(o.date)}</span></div><p style="margin:8px 0">العميل: <b>${esc(o.name)}</b> · <span dir="ltr">${esc(o.phone)}</span><br>السيارة: ${esc(o.car)} ${esc(o.plate)}</p><table><tr><th>الخدمة</th><th>السعر</th></tr>${o.items.map(i=>`<tr><td>${esc(i.n)}</td><td>${EGP(i.p)}</td></tr>`).join('')}${o.disc?`<tr><td>خصم</td><td>- ${EGP(o.disc)}</td></tr>`:''}<tr><td><b>الإجمالي</b></td><td><b>${EGP(tot(o))}</b></td></tr></table>${(o.pay||[]).length?`<table><tr><th>الدفعات</th><th>المبلغ</th></tr>${o.pay.map(p=>`<tr><td>${ME[p.m]} · ${fd(p.d)}${p.r?' · مرجع '+esc(p.r):''}</td><td>${EGP(p.a)}</td></tr>`).join('')}</table>`:''}<p><b>المتبقي: ${EGP(due(o))}</b></p>${payInfo(o)?`<p style="font-size:13px;white-space:pre-line">${esc(payInfo(o).trim())}</p>`:''}${o.wr&&wEnd(o)?`<p style="color:#0b6f7a">🛡️ ضمان حتى ${fd(wEnd(o))}</p>`:''}${o.note?`<p class="mut">ملاحظات: ${esc(o.note)}</p>`:''}</div>`;
+ curKind=kind;ov.innerHTML=tools+d;ov.className='on '+(kind==='war'?'a4':paper)}
+function mod(html,ok){const m=$('#md');m.innerHTML=`<div class="box">${html}<div class="acts" style="margin-top:12px"><button class="p" id="mok">تأكيد</button><button class="s" id="mno">إلغاء</button></div></div>`;m.className='on';$('#mno').onclick=()=>m.className='';$('#mok').onclick=()=>{ok();m.className=''}}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-a]');if(!b)return;const a=b.dataset.a,o=inv.find(x=>x.id===b.dataset.i);const nd={pay:'pay',st:'status',wa:'wa'}[a];if(nd&&!can(nd))return toast('ليس لديك صلاحية لهذا الإجراء',1);
+ if(a==='x')$('#ov').className='';else if(a==='prn')doPrint();else if(!o)return;
+ else if(a==='inv'||a==='war')showDoc(o.id,a);else if(a==='wa')wa(o);
+ else if(a==='pay'){const dd=due(o);mod(`<h3>دفعة على ${esc(o.no)} (المتبقي ${EGP(dd)})</h3><div class="f2"><div><label>المبلغ</label><input id="pa" type="number" min="0.01" step="0.01" value="${dd}"></div><div><label>الطريقة</label><select id="pm">${Object.entries(ME).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select></div></div><div class="f1"><label>مرجع العملية (اختياري)</label><input id="pr" dir="ltr"></div>`,()=>{const v=r2($('#pa').value);if(!(v>0)||v>due(o))return toast('المبلغ غير صالح أو أكبر من المتبقي',1);put({...o,pay:[...(o.pay||[]),{a:v,m:$('#pm').value,d:today(),r:$('#pr').value.trim()}]});toast('تم تسجيل الدفعة')})}
+ else if(a==='st')mod(`<h3>حالة ${esc(o.no)}</h3><select id="ss">${Object.entries(ST).filter(([k])=>k!=='cancel'||can('cancel')).map(([k,v])=>`<option value="${k}"${k===o.st?' selected':''}>${v}</option>`).join('')}</select>`,()=>{const s=$('#ss').value;if(s==='cancel'&&pd(o)>0&&!confirm('الفاتورة عليها مدفوعات. تأكد من ردّها للعميل. متابعة؟'))return;put({...o,st:s})})});
+render();
+</script>
+</body>
+</html>
