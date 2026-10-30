@@ -3,14 +3,26 @@ const C=window.HARX_CONFIG||{};let sb,me=null,prof=null,resolveReady,rec=0;const
 const ready=new Promise(r=>resolveReady=r),cache={},L={},VER={};
 const S='width:100%;padding:10px;margin:0 0 8px;border:1px solid #ccd;border-radius:8px;font:inherit;box-sizing:border-box';
 const B='padding:10px 14px;border:0;border-radius:8px;background:#0f9d9a;color:#fff;font:inherit;cursor:pointer;margin-inline-end:6px';
-function gate(h){let g=document.getElementById('hxg');if(!g){g=document.createElement('div');g.id='hxg';g.style.cssText='position:fixed;inset:0;z-index:99;background:#0d2a3a;align-items:center;justify-content:center;padding:16px;font-family:Tahoma,Arial,sans-serif;direction:rtl';document.body.appendChild(g)}
- g.style.display=h?'flex':'none';if(h)g.innerHTML='<div style="background:#fff;color:#12212c;border-radius:14px;padding:20px;width:min(380px,100%)">'+h+'</div>'}
+function gate(h,raw){let g=document.getElementById('hxgate');if(!g){g=document.createElement('div');g.id='hxgate';g.style.cssText='position:fixed;inset:0;z-index:99;background:linear-gradient(135deg,#0d2a3a,#0f6f7c);align-items:center;justify-content:center;padding:16px;font-family:Tahoma,Arial,sans-serif;direction:rtl;overflow:auto';document.body.appendChild(g)}
+ g.style.display=h?'flex':'none';if(h)g.innerHTML=raw?h:'<div style="background:#fff;color:#12212c;border-radius:14px;padding:20px;width:min(380px,100%)">'+h+'</div>'}
 const $=i=>document.getElementById(i);
-function login(msg){gate(`<h3 style="margin:0 0 12px">Harx</h3><input id="hxe" type="email" placeholder="الإيميل" style="${S}"><input id="hxp" type="password" placeholder="كلمة السر (8 أحرف على الأقل)" style="${S}"><input id="hxn" placeholder="الاسم (للحساب الجديد فقط)" style="${S}"><div id="hxm" style="color:#c0392b;min-height:20px;font-size:13px;margin-bottom:6px">${msg||''}</div><button id="hxi" style="${B}">دخول</button><button id="hxs" style="${B};background:#e9eff2;color:#234">حساب جديد</button><div style="margin-top:10px"><a href="#" id="hxf" style="font-size:13px;color:#0b6f7a">نسيت كلمة السر؟</a></div>`);
+function login(msg){gate(`<div style="width:min(400px,100%);text-align:center;color:#fff">
+ <svg viewBox="0 0 218 56" width="230" role="img" aria-label="Harx" style="display:block;margin:0 auto 8px;color:#fff"><use href="#hx-mark" x="0" y="2" width="46" height="50"/><use href="#hx-word" x="58" y="0" width="152" height="56"/></svg>
+ <div style="opacity:.85;margin-bottom:20px;font-size:14px">نظام إدارة محل حماية السيارات</div>
+ <div style="background:#fff;color:#12212c;border-radius:16px;padding:20px;text-align:right;box-shadow:0 12px 40px #0006">
+  <h3 style="margin:0 0 14px;font-size:18px">تسجيل الدخول</h3>
+  <input id="hxe" type="email" placeholder="الإيميل" dir="ltr" autocomplete="username" style="${S}">
+  <div style="position:relative"><input id="hxp" type="password" placeholder="كلمة السر" dir="ltr" autocomplete="current-password" style="${S};padding-right:64px"><button id="hxsh" type="button" style="position:absolute;right:10px;top:10px;border:0;background:none;cursor:pointer;color:#0b6f7a;font:inherit;font-size:13px">إظهار</button></div>
+  <div id="hxm" style="color:#c0392b;min-height:20px;font-size:13px;margin-bottom:6px">${msg||''}</div>
+  <button id="hxi" style="${B};width:100%;margin:0">دخول</button>
+  <div style="margin-top:12px;text-align:center"><a href="#" id="hxf" style="font-size:13px;color:#0b6f7a">نسيت كلمة السر؟</a></div>
+ </div>
+ <div style="opacity:.65;font-size:12px;margin-top:14px">الحسابات بيعملها مالك النظام فقط</div></div>`,1);
  const m=t=>$('hxm').textContent=t;
- $('hxi').onclick=async()=>{const{error}=await sb.auth.signInWithPassword({email:$('hxe').value.trim(),password:$('hxp').value});error?m('بيانات الدخول غير صحيحة'):start()};
- $('hxf').onclick=async ev=>{ev.preventDefault();const em=$('hxe').value.trim();if(!em)return m('اكتب إيميلك الأول');const{error}=await sb.auth.resetPasswordForEmail(em,{redirectTo:location.origin+location.pathname});m(error?error.message:'اتبعتلك رابط تغيير كلمة السر على الإيميل')};
- $('hxs').onclick=async()=>{const p=$('hxp').value;if(p.length<8)return m('كلمة السر 8 أحرف على الأقل');const{data,error}=await sb.auth.signUp({email:$('hxe').value.trim(),password:p,options:{data:{name:$('hxn').value.trim()}}});if(error)return m(error.message);data.session?start():m('تم إنشاء الحساب. أكّد الإيميل من الرسالة ثم ادخل.')}}
+ const go=async()=>{if(!$('hxe').value.trim()||!$('hxp').value)return m('اكتب الإيميل وكلمة السر');m('جاري الدخول...');const{error}=await sb.auth.signInWithPassword({email:$('hxe').value.trim(),password:$('hxp').value});error?m('الإيميل أو كلمة السر غير صحيحة'):start()};
+ $('hxi').onclick=go;[$('hxe'),$('hxp')].forEach(x=>x.addEventListener('keydown',e=>{if(e.key==='Enter')go()}));
+ $('hxsh').onclick=()=>{const p=$('hxp');p.type=p.type==='password'?'text':'password';$('hxsh').textContent=p.type==='password'?'إظهار':'إخفاء'};
+ $('hxf').onclick=async ev=>{ev.preventDefault();const em=$('hxe').value.trim();if(!em)return m('اكتب إيميلك الأول');const{error}=await sb.auth.resetPasswordForEmail(em,{redirectTo:location.origin+location.pathname});m(error?error.message:'اتبعتلك رابط تغيير كلمة السر على الإيميل')}}
 async function start(){const{data:{session}}=await sb.auth.getSession();if(!session)return login();me=session.user;
  const{data,error}=await sb.from('profiles').select('*').eq('id',me.id).single();if(error)return login('تعذّر تحميل الحساب: '+error.message);prof=data;
  if(prof.role==='pending'){gate('<h3>تم تسجيل حسابك ✅</h3><p>بانتظار موافقة المالك لتفعيله.</p><button id="hxr" style="'+B+'">تحديث</button><button id="hxo" style="'+B+';background:#e9eff2;color:#234">خروج</button>');$('hxr').onclick=start;$('hxo').onclick=out;return}
@@ -19,7 +31,7 @@ function recover(){rec=1;gate('<h3>كلمة سر جديدة</h3><input id="hxq" 
  $('hxu').onclick=async()=>{const p=$('hxq').value;if(p.length<8)return $('hxm').textContent='8 أحرف على الأقل';const{error}=await sb.auth.updateUser({password:p});if(error)return $('hxm').textContent=error.message;rec=0;start()}}
 const out=async()=>{await sb.auth.signOut();location.reload()};
 function bar(){if($('hxbar'))return;const d=document.createElement('div');d.id='hxbar';d.style.cssText='position:fixed;top:6px;left:6px;z-index:30;display:flex;gap:6px';
- d.innerHTML='<button id="hxx" style="'+B+';padding:6px 10px;font-size:12px">خروج</button>'+(prof.role==='owner'?'<button id="hxb" style="'+B+';padding:6px 10px;font-size:12px;background:#0d2a3a">نسخة احتياطية</button>':'');document.body.appendChild(d);$('hxx').onclick=out;if($('hxb'))$('hxb').onclick=backup}
+ d.innerHTML='<span style="color:#fff;font-size:12px;align-self:center;background:#0008;padding:4px 8px;border-radius:8px">● متصل · '+({owner:'مالك',manager:'مدير',reception:'استقبال',tech:'فني',viewer:'مشاهدة'}[prof.role]||prof.role)+'</span><button id="hxx" style="'+B+';padding:6px 10px;font-size:12px">خروج</button>'+'<button id="hxpw" style="'+B+';padding:6px 10px;font-size:12px;background:#0d2a3a">كلمة السر</button>'+(prof.role==='owner'?'<button id="hxb" style="'+B+';padding:6px 10px;font-size:12px;background:#0d2a3a">نسخة احتياطية</button>':'');document.body.appendChild(d);$('hxx').onclick=out;$('hxpw').onclick=async()=>{const p=prompt('اكتب كلمة السر الجديدة (8 أحرف على الأقل)');if(!p)return;if(p.length<8)return alert('8 أحرف على الأقل');const{error}=await sb.auth.updateUser({password:p});alert(error?error.message:'تم تغيير كلمة السر')};if($('hxb'))$('hxb').onclick=backup}
 async function backup(){const all=[];for(let f=0;;f+=1000){const{data,error}=await sb.from('docs').select('*').order('path').range(f,f+999);if(error)return alert(error.message);all.push(...data);if(data.length<1000)break}
  const{data:pr}=await sb.from('profiles').select('*');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify({at:new Date().toISOString(),docs:all,profiles:pr})],{type:'application/json'}));a.download='harx-backup-'+new Date().toISOString().slice(0,10)+'.json';a.click()}
 const notify=k=>(L[k]||new Set()).forEach(f=>f());
@@ -49,19 +61,14 @@ const U={id:async()=>me.id,isOwner:async()=>prof.role==='owner',canEdit:async()=
  async search(q){const{data}=await sb.from('profiles').select('id,name').ilike('name','%'+String(q).replace(/[%_]/g,'')+'%').neq('role','owner').limit(10);return data||[]}};
 const A={upload:f=>new Promise((ok,no)=>{if(f.size>400000)return no(new Error('الصورة أكبر من 400KB'));const r=new FileReader();r.onload=()=>ok({url:r.result});r.onerror=no;r.readAsDataURL(f)})};
 window.claude={use:async n=>{await ready;return({db:DB,user:U,assets:A})[n]||null}};
-document.addEventListener('DOMContentLoaded',()=>{if(!C.url||/PASTE/.test(C.url+C.key)||!window.supabase)return gate('<h3>الإعداد ناقص</h3><p>افتح index.html وحط Project URL و anon key في أول الملف (راجع README).</p>');sb=window.supabase.createClient(C.url,C.key);sb.auth.onAuthStateChange(ev=>{if(ev==='PASSWORD_RECOVERY')recover()});start()});
+document.addEventListener('DOMContentLoaded',()=>{if(!C.url||/PASTE/.test(C.url+C.key)||!window.supabase)return gate('<h3>الإعداد ناقص</h3><p>افتح index.html وحط Project URL و anon key في أول الملف (راجع README).</p>');sb=window.supabase.createClient(C.url,C.key);window.__sb=sb;sb.auth.onAuthStateChange(ev=>{if(ev==='PASSWORD_RECOVERY')recover()});start()});
 
 document.addEventListener('click',async e=>{if(e.target.id!=='hxadd')return;const v=i=>document.getElementById(i).value.trim(),m=document.getElementById('hxam'),say=t=>m.textContent=t;
  const name=v('hxan'),email=v('hxae'),pw=document.getElementById('hxap').value,role=v('hxar');
  if(!name||!email||pw.length<8)return say('اكتب الاسم والإيميل وكلمة سر 8 أحرف على الأقل');
- if(!prof||prof.role!=='owner')return say('الإنشاء للمالك فقط');say('جاري الإنشاء...');
- try{const t=window.supabase.createClient(C.url,C.key,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
-  const{data,error}=await t.auth.signUp({email,password:pw,options:{data:{name}}});if(error)return say(error.message);
-  const u=data&&data.user;if(!u)return say('تعذّر إنشاء الحساب');if(u.identities&&!u.identities.length)return say('الإيميل ده مسجّل قبل كده. ابحث عنه بالاسم تحت وفعّله.');
-  await new Promise(r=>setTimeout(r,700));
-  const{data:ok,error:e2}=await sb.from('profiles').update({role}).eq('id',u.id).select();
-  if(e2||!ok||!ok.length)return say('اتعمل الحساب لكن تفعيل الدور فشل. ابحث عنه بالاسم تحت وفعّله.');
-  notify('staff');['hxan','hxae','hxap'].forEach(i=>document.getElementById(i).value='');
-  say('✅ تم إنشاء حساب '+name+'. سلّمه الإيميل وكلمة السر.'+(data.session?'':' ⚠️ لازم يأكّد الإيميل من رسالة Supabase، أو اقفل Confirm email من إعدادات Authentication.'))}
- catch(x){say('خطأ: '+(x.message||x))}});
+ say('جاري الإنشاء...');
+ const{error}=await sb.rpc('create_staff',{p_email:email,p_password:pw,p_name:name,p_role:role});
+ if(error)return say(error.message);
+ notify('staff');window.hxReload&&window.hxReload();['hxan','hxae','hxap'].forEach(i=>document.getElementById(i).value='');
+ say('✅ تم إنشاء حساب '+name+'. سلّمه الإيميل وكلمة السر ويدخل فوراً.')});
 })();

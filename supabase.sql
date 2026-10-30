@@ -104,3 +104,138 @@ do $$ begin
   begin alter publication supabase_realtime add table docs; exception when others then null; end;
   begin alter publication supabase_realtime add table profiles; exception when others then null; end;
 end $$;
+
+-- ===== النسخ الاحتياطي داخل Supabase (نسخة يومية + يدوي + استرجاع) =====
+create extension if not exists pg_cron;
+create table if not exists backups(id bigserial primary key, taken_at timestamptz not null default now(),
+  kind text not null check (kind in ('auto','manual','pre-restore')), doc_count int not null, data jsonb not null);
+alter table backups enable row level security;
+drop policy if exists b_sel on backups;
+create policy b_sel on backups for select using (my_role() = 'owner');
+revoke all on backups from anon, authenticated;
+grant select (id, taken_at, kind, doc_count) on backups to authenticated;
+create or replace function public.take_backup(p_kind text default 'manual') returns bigint language plpgsql security definer set search_path=public as $$
+declare bid bigint;
+begin
+  if auth.uid() is not null and my_role() is distinct from 'owner' then raise exception 'النسخ الاحتياطي للمالك فقط'; end if;
+  if p_kind not in ('auto','manual','pre-restore') then raise exception 'نوع نسخة غير صالح'; end if;
+  insert into backups(kind, doc_count, data) select p_kind, count(*), coalesce(jsonb_agg(to_jsonb(d)), '[]'::jsonb) from docs d returning id into bid;
+  delete from backups where kind = 'auto' and id not in (select id from backups where kind = 'auto' order by id desc limit 14);
+  delete from backups where kind = 'manual' and id not in (select id from backups where kind = 'manual' order by id desc limit 20);
+  delete from backups where kind = 'pre-restore' and id not in (select id from backups where kind = 'pre-restore' order by id desc limit 5);
+  return bid;
+end $$;
+create or replace function public.restore_backup(p_id bigint) returns int language plpgsql security definer set search_path=public as $$
+declare b backups%rowtype; cnt int;
+begin
+  if my_role() is distinct from 'owner' then raise exception 'الاسترجاع للمالك فقط'; end if;
+  select * into b from backups where id = p_id;
+  if not found then raise exception 'النسخة غير موجودة'; end if;
+  perform take_backup('pre-restore');
+  alter table docs disable trigger docs_bu;
+  delete from docs where true;
+  insert into docs select * from jsonb_populate_recordset(null::docs, b.data);
+  get diagnostics cnt = row_count;
+  alter table docs enable trigger docs_bu;
+  return cnt;
+end $$;
+revoke all on function public.take_backup(text) from public, anon;
+revoke all on function public.restore_backup(bigint) from public, anon;
+grant execute on function public.take_backup(text) to authenticated;
+grant execute on function public.restore_backup(bigint) to authenticated;
+select cron.unschedule(jobid) from cron.job where jobname = 'harx-daily-backup';
+select cron.schedule('harx-daily-backup', '0 1 * * *', $$select public.take_backup('auto')$$);
+
+-- ===== إدارة الموظفين من القاعدة (بدون إيميلات تأكيد) =====
+create or replace function public._mk_user(p_email text, p_password text, p_name text) returns uuid
+language plpgsql security definer set search_path=public, extensions, auth as $$
+declare uid uuid := gen_random_uuid(); em text := lower(trim(p_email));
+begin
+  insert into auth.users(instance_id,id,aud,role,email,encrypted_password,email_confirmed_at,raw_app_meta_data,raw_user_meta_data,
+    created_at,updated_at,confirmation_token,recovery_token,email_change_token_new,email_change,email_change_token_current,phone_change,phone_change_token,reauthentication_token)
+  values('00000000-0000-0000-0000-000000000000',uid,'authenticated','authenticated',em,crypt(p_password,gen_salt('bf')),now(),
+    '{"provider":"email","providers":["email"]}'::jsonb, jsonb_build_object('name',coalesce(p_name,'')),now(),now(),'','','','','','','','');
+  insert into auth.identities(id,user_id,provider_id,identity_data,provider,last_sign_in_at,created_at,updated_at)
+  values(gen_random_uuid(),uid,uid::text,jsonb_build_object('sub',uid::text,'email',em,'email_verified',true),'email',now(),now(),now());
+  return uid;
+end $$;
+revoke all on function public._mk_user(text,text,text) from public, anon, authenticated;
+create or replace function public.create_staff(p_email text, p_password text, p_name text, p_role text) returns uuid
+language plpgsql security definer set search_path=public, extensions, auth as $$
+declare uid uuid; em text := lower(trim(p_email));
+begin
+  if my_role() is distinct from 'owner' then raise exception 'إنشاء الحسابات للمالك فقط'; end if;
+  if em !~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' then raise exception 'الإيميل غير صالح'; end if;
+  if length(coalesce(p_password,'')) < 8 then raise exception 'كلمة السر 8 أحرف على الأقل'; end if;
+  if p_role not in ('manager','reception','tech','viewer') then raise exception 'دور غير صالح'; end if;
+  if exists(select 1 from auth.users where lower(email) = em) then raise exception 'الإيميل ده مسجّل قبل كده'; end if;
+  uid := public._mk_user(em, p_password, p_name);
+  update profiles set role = p_role, name = coalesce(nullif(trim(p_name),''), name) where id = uid;
+  return uid;
+end $$;
+create or replace function public.set_staff_password(p_user uuid, p_password text) returns void
+language plpgsql security definer set search_path=public, extensions, auth as $$
+begin
+  if my_role() is distinct from 'owner' then raise exception 'تغيير كلمة السر للمالك فقط'; end if;
+  if length(coalesce(p_password,'')) < 8 then raise exception 'كلمة السر 8 أحرف على الأقل'; end if;
+  if not exists(select 1 from profiles where id = p_user and role <> 'owner') then raise exception 'مش مسموح لحساب المالك من هنا'; end if;
+  update auth.users set encrypted_password = crypt(p_password, gen_salt('bf')), updated_at = now() where id = p_user;
+end $$;
+revoke all on function public.create_staff(text,text,text,text) from public, anon;
+revoke all on function public.set_staff_password(uuid,text) from public, anon;
+grant execute on function public.create_staff(text,text,text,text) to authenticated;
+grant execute on function public.set_staff_password(uuid,text) to authenticated;
+
+-- ===== لوحة الحسابات + قفل التسجيل العام =====
+-- (دالة _mk_user أعلاه لازم تتحدّث بالنسخة دي: بتفتح علَم السماح قبل إنشاء الحساب)
+create or replace function public._mk_user(p_email text, p_password text, p_name text) returns uuid
+language plpgsql security definer set search_path=public, extensions, auth as $$
+declare uid uuid := gen_random_uuid(); em text := lower(trim(p_email));
+begin
+  perform set_config('harx.allow_signup', '1', true);
+  insert into auth.users(instance_id,id,aud,role,email,encrypted_password,email_confirmed_at,raw_app_meta_data,raw_user_meta_data,
+    created_at,updated_at,confirmation_token,recovery_token,email_change_token_new,email_change,email_change_token_current,phone_change,phone_change_token,reauthentication_token)
+  values('00000000-0000-0000-0000-000000000000',uid,'authenticated','authenticated',em,crypt(p_password,gen_salt('bf')),now(),
+    '{"provider":"email","providers":["email"]}'::jsonb, jsonb_build_object('name',coalesce(p_name,'')),now(),now(),'','','','','','','','');
+  insert into auth.identities(id,user_id,provider_id,identity_data,provider,last_sign_in_at,created_at,updated_at)
+  values(gen_random_uuid(),uid,uid::text,jsonb_build_object('sub',uid::text,'email',em,'email_verified',true),'email',now(),now(),now());
+  return uid;
+end $$;
+revoke all on function public._mk_user(text,text,text) from public, anon, authenticated;
+create or replace function public.block_public_signup() returns trigger language plpgsql as $$
+begin
+  if coalesce(current_setting('harx.allow_signup', true), '') <> '1' then
+    raise exception 'التسجيل العام مقفول. الحسابات بيعملها مالك النظام فقط';
+  end if;
+  return new;
+end $$;
+drop trigger if exists harx_block_signup on auth.users;
+create trigger harx_block_signup before insert on auth.users for each row execute function public.block_public_signup();
+create or replace function public.list_staff() returns table(id uuid, name text, email text, role text, last_sign_in_at timestamptz, created_at timestamptz)
+language plpgsql security definer set search_path=public, auth as $$
+begin
+  if my_role() is distinct from 'owner' then raise exception 'للمالك فقط'; end if;
+  return query select p.id, p.name, u.email::text, p.role, u.last_sign_in_at, u.created_at
+    from profiles p join auth.users u on u.id = p.id where p.role <> 'owner' order by u.created_at desc;
+end $$;
+create or replace function public.set_staff_role(p_user uuid, p_role text) returns void
+language plpgsql security definer set search_path=public, auth as $$
+begin
+  if my_role() is distinct from 'owner' then raise exception 'للمالك فقط'; end if;
+  if p_role not in ('manager','reception','tech','viewer','pending') then raise exception 'دور غير صالح'; end if;
+  update profiles set role = p_role where id = p_user and role <> 'owner';
+  if not found then raise exception 'الحساب غير موجود أو هو حساب المالك'; end if;
+end $$;
+create or replace function public.delete_staff(p_user uuid) returns void
+language plpgsql security definer set search_path=public, auth as $$
+begin
+  if my_role() is distinct from 'owner' then raise exception 'للمالك فقط'; end if;
+  if not exists(select 1 from profiles where id = p_user and role <> 'owner') then raise exception 'الحساب غير موجود أو هو حساب المالك'; end if;
+  delete from auth.users where id = p_user;
+end $$;
+revoke all on function public.list_staff() from public, anon;
+revoke all on function public.set_staff_role(uuid,text) from public, anon;
+revoke all on function public.delete_staff(uuid) from public, anon;
+grant execute on function public.list_staff() to authenticated;
+grant execute on function public.set_staff_role(uuid,text) to authenticated;
+grant execute on function public.delete_staff(uuid) to authenticated;
