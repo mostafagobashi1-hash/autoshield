@@ -239,3 +239,8 @@ revoke all on function public.delete_staff(uuid) from public, anon;
 grant execute on function public.list_staff() to authenticated;
 grant execute on function public.set_staff_role(uuid,text) to authenticated;
 grant execute on function public.delete_staff(uuid) to authenticated;
+
+-- ===== جداول التقارير (نسخة تلقائية من بيانات النظام) + جدول الأسعار =====
+-- الجداول: customers, invoices, invoice_items, payments, service_prices
+-- الـ views: v_daily_sales, v_payments_by_method, v_sales_by_service, v_customer_summary, v_monthly
+-- التفاصيل الكاملة اتطبّقت على مشروعك مباشرة (migration: harx_reporting_tables). لإعادة بناء الجداول من البيانات: select public.rebuild_mirror();

@@ -11,7 +11,7 @@ function login(msg){gate(`<div style="width:min(400px,100%);text-align:center;co
  <div style="opacity:.85;margin-bottom:20px;font-size:14px">نظام إدارة محل حماية السيارات</div>
  <div style="background:#fff;color:#12212c;border-radius:16px;padding:20px;text-align:right;box-shadow:0 12px 40px #0006">
   <h3 style="margin:0 0 14px;font-size:18px">تسجيل الدخول</h3>
-  <input id="hxe" type="email" placeholder="الإيميل" dir="ltr" autocomplete="username" style="${S}">
+  <input id="hxe" type="text" inputmode="email" placeholder="اسم المستخدم أو الإيميل" dir="ltr" autocapitalize="none" autocomplete="username" style="${S}">
   <div style="position:relative"><input id="hxp" type="password" placeholder="كلمة السر" dir="ltr" autocomplete="current-password" style="${S};padding-right:64px"><button id="hxsh" type="button" style="position:absolute;right:10px;top:10px;border:0;background:none;cursor:pointer;color:#0b6f7a;font:inherit;font-size:13px">إظهار</button></div>
   <div id="hxm" style="color:#c0392b;min-height:20px;font-size:13px;margin-bottom:6px">${msg||''}</div>
   <button id="hxi" style="${B};width:100%;margin:0">دخول</button>
@@ -19,10 +19,10 @@ function login(msg){gate(`<div style="width:min(400px,100%);text-align:center;co
  </div>
  <div style="opacity:.65;font-size:12px;margin-top:14px">الحسابات بيعملها مالك النظام فقط</div></div>`,1);
  const m=t=>$('hxm').textContent=t;
- const go=async()=>{if(!$('hxe').value.trim()||!$('hxp').value)return m('اكتب الإيميل وكلمة السر');m('جاري الدخول...');const{error}=await sb.auth.signInWithPassword({email:$('hxe').value.trim(),password:$('hxp').value});error?m('الإيميل أو كلمة السر غير صحيحة'):start()};
+ const go=async()=>{if(!$('hxe').value.trim()||!$('hxp').value)return m('اكتب الإيميل وكلمة السر');m('جاري الدخول...');const u=$('hxe').value.trim().toLowerCase(),em=u.includes('@')?u:u+'@harx.local';const{error}=await sb.auth.signInWithPassword({email:em,password:$('hxp').value});error?m('اسم المستخدم أو كلمة السر غير صحيحة'):start()};
  $('hxi').onclick=go;[$('hxe'),$('hxp')].forEach(x=>x.addEventListener('keydown',e=>{if(e.key==='Enter')go()}));
  $('hxsh').onclick=()=>{const p=$('hxp');p.type=p.type==='password'?'text':'password';$('hxsh').textContent=p.type==='password'?'إظهار':'إخفاء'};
- $('hxf').onclick=async ev=>{ev.preventDefault();const em=$('hxe').value.trim();if(!em)return m('اكتب إيميلك الأول');const{error}=await sb.auth.resetPasswordForEmail(em,{redirectTo:location.origin+location.pathname});m(error?error.message:'اتبعتلك رابط تغيير كلمة السر على الإيميل')}}
+ $('hxf').onclick=async ev=>{ev.preventDefault();const em=$('hxe').value.trim();if(!em)return m('اكتب إيميلك الأول');if(!em.includes('@'))return m('حساب باسم مستخدم: المالك هو اللي بيغيّر كلمة السر من تبويب الحسابات');const{error}=await sb.auth.resetPasswordForEmail(em,{redirectTo:location.origin+location.pathname});m(error?error.message:'اتبعتلك رابط تغيير كلمة السر على الإيميل')}}
 async function start(){const{data:{session}}=await sb.auth.getSession();if(!session)return login();me=session.user;
  const{data,error}=await sb.from('profiles').select('*').eq('id',me.id).single();if(error)return login('تعذّر تحميل الحساب: '+error.message);prof=data;
  if(prof.role==='pending'){gate('<h3>تم تسجيل حسابك ✅</h3><p>بانتظار موافقة المالك لتفعيله.</p><button id="hxr" style="'+B+'">تحديث</button><button id="hxo" style="'+B+';background:#e9eff2;color:#234">خروج</button>');$('hxr').onclick=start;$('hxo').onclick=out;return}
