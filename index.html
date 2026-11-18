@@ -268,7 +268,7 @@ function render(){const t=today(),act=inv.filter(o=>o.st!=='cancel');
  $('#meth').innerHTML=Object.keys(m).length?Object.entries(ME).map(([k,n])=>`<div style="display:flex;justify-content:space-between;font-size:14px"><span>${n}</span><b>${EGP(m[k]||0)}</b></div><div class="bar"><i style="width:${(m[k]||0)/mx*100}%"></i></div>`).join(''):'<span class="mut">لا توجد مدفوعات بعد</span>';
  $('#recent').innerHTML=inv.slice(0,5).map(row).join('')||'<div class="card mut">ابدأ بإنشاء أول فاتورة من تبويب «فاتورة جديدة».</div>';
  const q=$('#q').value.trim().toLowerCase();
- $('#rows').innerHTML=inv.filter(o=>!q||(o.no+o.name+o.phone+o.plate).toLowerCase().includes(q)).map(row).join('')||'<div class="card mut">لا توجد فواتير.</div>'}
+ const fl=inv.filter(o=>!q||(o.no+o.name+o.phone+o.plate+(o.cc||'')).toLowerCase().includes(q));$('#rows').innerHTML=(fl.slice(0,RLIM).map(row).join('')+(fl.length>RLIM?`<button class="s" id="rmore" style="width:100%;margin:8px 0;padding:11px">عرض المزيد (${fl.length-RLIM} فاتورة)</button>`:''))||'<div class="card mut">لا توجد فواتير.</div>'}
 $('#q').oninput=render;
 function fillSet(){const f=$('#sf');if(f.contains(document.activeElement))return;[['sn','sn'],['sp','sp'],['sa','sa'],['si','ip'],['sw','wl'],['sb','bk']].forEach(([i,k])=>$('#'+i).value=SET[k]||'');$('#sg').value=SET.gen??DEF_GEN;$('#pol').innerHTML=SV.map(([k,n])=>`<div class="card" style="margin-bottom:8px"><b>${n}</b><div class="f1" style="margin-top:8px"><label>مدة الضمان (شهور، 0 = بدون ضمان)</label><input id="pm-${k}" type="number" min="0" value="${pol(k).m}"></div><label>شروط الخدمة (كل سطر شرط)</label><textarea id="pt-${k}" rows="4">${esc(pol(k).t)}</textarea></div>`).join('')}
 $('#sf').onsubmit=e=>{e.preventDefault();const v={...SET,pol:readPol(),gen:$('#sg').value,sn:$('#sn').value.trim(),sp:$('#sp').value.trim(),sa:$('#sa').value.trim(),ip:$('#si').value.trim(),wl:$('#sw').value.trim(),bk:$('#sb').value.trim()};SET=v;if(SD)SD.set(v).then(()=>toast('تم حفظ الإعدادات')).catch(()=>toast('تعذّر الحفظ',1));else toast('تم الحفظ مؤقتاً')};
@@ -402,7 +402,12 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-a=de
  const t=prompt('حذف الفاتورة '+o.no+' نهائياً (المدفوع '+EGP(pd(o))+').\nهيتاخد نسخة احتياطية قبل الحذف.\nللتأكيد اكتب رقم الفاتورة:');if(t==null)return;
  if(t.trim().toUpperCase()!==String(o.no).toUpperCase())return toast('الرقم مش مطابق. الفاتورة ما اتحذفتش',1);
  try{try{await window.__sb.rpc('take_backup',{p_kind:'manual'})}catch(_){}const db=await claude.use('db');await db.doc('invoices/'+o.id).delete();toast('تم حذف الفاتورة '+o.no)}catch(x){toast('تعذّر الحذف: '+(x.message||''),1)}});
+
+var RLIM=100;
+$('#q').addEventListener('input',()=>{RLIM=100},true);
+document.addEventListener('click',e=>{if(e.target.id==='rmore'){RLIM+=100;render()}});
 const _rd=render;render=()=>{_rd();const k=can('report');['#stats','#meth'].forEach(s=>{const e=$(s);if(e){e.style.display=k?'':'none';if(s==='#meth'&&e.previousElementSibling)e.previousElementSibling.style.display=k?'':'none'}})};
+const _rf=render;let _rt;render=()=>{clearTimeout(_rt);_rt=setTimeout(_rf,80)};
 render();
 </script>
 </body>
