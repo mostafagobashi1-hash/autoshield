@@ -325,7 +325,7 @@ function waText(o){if(phn(o.phone).length<11)return toast('رقم موبايل �
 const head=()=>`<div style="display:flex;align-items:center;gap:8px;color:#0a0a0a">${SET.logo?`<img src="${esc(SET.logo)}" alt="" style="height:44px;max-width:120px;object-fit:contain">`:`<img src="${window.HX_LOGO_DARK}" alt="" style="height:44px">`}<div><b style="font-size:20px">${esc(SET.sn||'Harx')}</b><div style="font-size:12px;color:#6b665a">${esc([SET.sp,SET.sa].filter(Boolean).join(' · ')||'حماية السيارات')}</div></div></div>`;
 function invHtml(o){return `<div class="doc">${head()}<div style="display:flex;justify-content:space-between;margin-top:12px;font-size:14px"><span>فاتورة رقم <b>${esc(o.no)}</b>${o.cc?` · كود العميل <b>${esc(o.cc)}</b>`:''}</span><span>${fd(o.date)}</span></div><p style="margin:8px 0">العميل: <b>${esc(o.name)}</b> · <span dir="ltr">${esc(o.phone)}</span><br>السيارة: ${esc(o.car)} ${esc(o.plate)}</p><table><tr><th>الخدمة</th><th>السعر</th></tr>${o.items.map(i=>`<tr><td>${esc(i.n)}${i.d?`<div style="font-size:11px;color:#6b665a;font-weight:400">${esc(i.d)}</div>`:''}</td><td>${EGP(i.p)}</td></tr>`).join('')}${o.disc?`<tr><td>خصم</td><td>- ${EGP(o.disc)}</td></tr>`:''}<tr><td><b>الإجمالي</b></td><td><b>${EGP(tot(o))}</b></td></tr></table>${(o.pay||[]).length?`<table><tr><th>الدفعات</th><th>المبلغ</th></tr>${o.pay.map(p=>`<tr><td>${ME[p.m]} · ${fd(p.d)}${p.r?' · مرجع '+esc(p.r):''}</td><td>${EGP(p.a)}</td></tr>`).join('')}</table>`:''}<p><b>المتبقي: ${EGP(due(o))}</b></p>${payInfo(o)?`<p style="font-size:13px;white-space:pre-line">${esc(payInfo(o).trim())}</p>`:''}${o.wr&&wEnd(o)?`<p style="color:#8f7014">🛡️ ضمان حتى ${fd(wEnd(o))}</p>`:''}${o.note?`<p class="mut">ملاحظات: ${esc(o.note)}</p>`:''}</div>`}
 function showDoc(id,kind){const o=inv.find(x=>x.id===id);if(!o)return;const ov=$('#ov');
- const tools=`<div class="dtool"><select id="pp" style="width:auto" title="مقاس الورق">${PP.map(([k,v])=>`<option value="${k}"${k===paper?' selected':''}>${v}</option>`).join('')}</select><button class="p" data-a="prn">طباعة / حفظ PDF</button><button class="btn wa" data-a="wa" data-i="${esc(o.id)}">إرسال PDF واتساب</button><button class="s" data-a="wat" data-i="${esc(o.id)}">رسالة نصية</button><button class="s" data-a="x">إغلاق</button></div><div class="dtool" style="color:#f1d27a;font-size:12px">اختار الطابعة من نافذة الطباعة اللي هتفتح، والمتصفح بيفتكر آخر طابعة استخدمتها. شهادة الضمان بتطبع دايماً على A4.</div>`;
+ const tools=`<div class="dtool"><select id="pp" style="width:auto" title="مقاس الورق">${PP.map(([k,v])=>`<option value="${k}"${k===paper?' selected':''}>${v}</option>`).join('')}</select><button class="p" data-a="prn">طباعة / حفظ PDF</button><button class="btn wa" data-a="wa" data-i="${esc(o.id)}">إرسال واتساب (رابط PDF)</button><button class="s" data-a="wash" data-i="${esc(o.id)}">مشاركة الملفات كمرفق</button><button class="s" data-a="wat" data-i="${esc(o.id)}">رسالة نصية</button><button class="s" data-a="x">إغلاق</button></div><div class="dtool" style="color:#f1d27a;font-size:12px">اختار الطابعة من نافذة الطباعة اللي هتفتح، والمتصفح بيفتكر آخر طابعة استخدمتها. شهادة الضمان بتطبع دايماً على A4.</div>`;
  const d=kind==='war'?certHtml(o):kind==='x'?`<div class="doc cert">${head()}<svg width="70" height="70" style="color:#c9a227;margin-top:8px"><use href="#shield"/></svg><h1>شهادة ضمان</h1><div>رقم الشهادة: <b>W-${esc(o.no)}</b></div><p>تشهد Harx بأن السيارة <b>${esc(o.car)} ${esc(o.plate)}</b> الخاصة بالسيد/ة <b>${esc(o.name)}</b> تم تنفيذ الخدمات التالية عليها وهي مشمولة بالضمان:</p><p><b>${o.items.map(i=>esc(i.n)).join(' · ')}</b></p><table><tr><th>بداية الضمان (تاريخ الفاتورة)</th><th>نهاية الضمان</th></tr><tr><td>${fd(o.date)}</td><td>${fd(endW(o.date))}</td></tr></table><div class="terms"><b>شروط الضمان:</b><ol>${TERMS.map(x=>`<li>${x}</li>`).join('')}</ol></div><div class="sig"><span>ختم وتوقيع المحل: ________</span><span>توقيع العميل: ________</span></div></div>`
  :invHtml(o);
  curKind=kind;ov.innerHTML=tools+d;ov.className='on '+(kind==='war'?'a4':paper)}
@@ -376,7 +376,8 @@ document.querySelector('nav [data-t=staff]')&&document.querySelector('nav [data-
 
 const COMMON='عزل حراري LEAR (99% عزل) · Nano Graphene للتابلوه والصالون والأجزاء الداخلية والجنوط · اسكرينة حماية للشاشة · تركيب احترافي وضمان وخدمة ما بعد البيع';
 const PKG_DEF=[{k:'pk1',n:'الباقة الأولى',p:30000,m:12,d:'PPF حماية خارجية بخامة HEXIS / XPEL / 3M Scotchgard · '+COMMON,on:1},{k:'pk2',n:'الباقة الثانية',p:45000,m:12,d:'PPF حماية خارجية بخامة LEAR Supreme · '+COMMON,on:1},{k:'pk3',n:'الباقة الثالثة (الفئة الأعلى)',p:55000,m:12,d:'PPF حماية خارجية بخامة LEAR Premium Grade · '+COMMON,on:1}];
-const MLIST=[[0,'بدون ضمان'],[3,'3 شهور'],[6,'6 شهور'],[12,'سنة'],[24,'سنتين'],[36,'3 سنين'],[60,'5 سنين']];
+const MLIST=[[0,'بدون ضمان'],[3,'3 شهور'],[6,'6 شهور'],[12,'سنة'],[24,'سنتين'],[36,'3 سنين'],[60,'5 سنين'],[96,'8 سنين'],[120,'10 سنين'],[144,'12 سنة']];
+const mlFor=c=>MLIST.some(([v])=>v===+c)?MLIST:[...MLIST,[+c,(+c%12?c+' شهر':(+c/12)+' سنة')]].sort((a,b)=>a[0]-b[0]);
 let PKG=null,PKE=null;
 const pkList=()=>(PKG||PKG_DEF).filter(x=>x.on!==0&&x.on!==false);
 function pkgItems(){return[...document.querySelectorAll('#pkgs .svc')].filter(r=>r.querySelector('input[type=checkbox]').checked).map(r=>{const x=(PKG||PKG_DEF).find(q=>q.k===r.dataset.k)||{};return{k:x.k,n:x.n,p:r2(r.querySelector('input[type=number]').value),m:+x.m||0,t:'',d:x.d||''}})}
@@ -390,7 +391,7 @@ $('#manadd').onclick=()=>$('#man').insertAdjacentHTML('beforeend',manRow());
 $('#man').addEventListener('click',e=>{if(e.target.closest('[data-a=mandel]')){e.target.closest('.man').remove();calc()}});$('#man').addEventListener('input',calc);$('#man').addEventListener('change',calc);
 $('#f').addEventListener('reset',()=>setTimeout(()=>{renderPkgs();$('#man').innerHTML='';calc()},0));
 const pkEd=()=>PKE||(PKE=JSON.parse(JSON.stringify(PKG||PKG_DEF)));
-function renderPkgAdmin(){const el=$('#pkadm');if(!el)return;el.innerHTML=pkEd().map((x,i)=>`<div class="pkrow" data-i="${i}"><input class="pn" placeholder="اسم الباقة / المنتج" value="${esc(x.n)}"><input class="pp" type="number" min="0" step="0.01" placeholder="السعر" value="${x.p||''}"><input class="pd" style="grid-column:1/-1" placeholder="التفاصيل (اختياري)" value="${esc(x.d||'')}"><select class="pm">${MLIST.map(([v,l])=>`<option value="${v}"${(+x.m||0)===v?' selected':''}>ضمان: ${l}</option>`).join('')}</select><label style="display:flex;align-items:center;gap:6px;margin:0;color:var(--ink)"><input class="po" type="checkbox"${x.on===0||x.on===false?'':' checked'} style="width:auto"> ظاهرة في الفاتورة</label><button type="button" class="s" data-a="pkdel" style="grid-column:1/-1;color:#c0392b">حذف</button></div>`).join('')||'<div class="mut">مفيش باقات. اضغط «+ باقة / منتج جديد».</div>'}
+function renderPkgAdmin(){const el=$('#pkadm');if(!el)return;el.innerHTML=pkEd().map((x,i)=>`<div class="pkrow" data-i="${i}"><input class="pn" placeholder="اسم الباقة / المنتج" value="${esc(x.n)}"><input class="pp" type="number" min="0" step="0.01" placeholder="السعر" value="${x.p||''}"><input class="pd" style="grid-column:1/-1" placeholder="التفاصيل (اختياري)" value="${esc(x.d||'')}"><select class="pm">${mlFor(x.m||0).map(([v,l])=>`<option value="${v}"${(+x.m||0)===v?' selected':''}>ضمان: ${l}</option>`).join('')}</select><label style="display:flex;align-items:center;gap:6px;margin:0;color:var(--ink)"><input class="po" type="checkbox"${x.on===0||x.on===false?'':' checked'} style="width:auto"> ظاهرة في الفاتورة</label><button type="button" class="s" data-a="pkdel" style="grid-column:1/-1;color:#c0392b">حذف</button></div>`).join('')||'<div class="mut">مفيش باقات. اضغط «+ باقة / منتج جديد».</div>'}
 $('#pkadm').addEventListener('input',e=>{const r=e.target.closest('.pkrow');if(!r)return;const x=pkEd()[+r.dataset.i];x.n=r.querySelector('.pn').value;x.p=r.querySelector('.pp').value;x.d=r.querySelector('.pd').value});
 $('#pkadm').addEventListener('change',e=>{const r=e.target.closest('.pkrow');if(!r)return;const x=pkEd()[+r.dataset.i];x.m=+r.querySelector('.pm').value;x.on=r.querySelector('.po').checked?1:0});
 $('#pkadm').addEventListener('click',e=>{if(!e.target.closest('[data-a=pkdel]'))return;const r=e.target.closest('.pkrow');if(confirm('حذف «'+(pkEd()[+r.dataset.i].n||'الخانة')+'»؟ الفواتير القديمة مش بتتأثر.')){pkEd().splice(+r.dataset.i,1);renderPkgAdmin()}});
@@ -410,15 +411,15 @@ var RLIM=100;
 $('#q').addEventListener('input',()=>{RLIM=100},true);
 document.addEventListener('click',e=>{if(e.target.id==='rmore'){RLIM+=100;render()}});
 
-function wa(o){return waPdf(o)}
+function wa(o){return waLink(o)}
 function hxLoad(u){return new Promise((ok,no)=>{const x=document.createElement('script');x.src=u;x.onload=ok;x.onerror=()=>no(new Error('تعذّر تحميل '+u));document.head.appendChild(x)})}
 async function hxLibs(){const L=[['html2canvas',()=>window.html2canvas,'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js','https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js'],['jspdf',()=>window.jspdf,'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js','https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js']];
  for(const [n,have,u1,u2] of L){if(have())continue;try{await hxLoad(u1)}catch(e){await hxLoad(u2)}if(!have())throw new Error('مكتبة '+n+' ما اشتغلتش')}}
 async function pdfFromHtml(html,name){await hxLibs();const host=document.createElement('div');host.style.cssText='position:fixed;left:-12000px;top:0;width:794px;background:#fff;direction:rtl';host.innerHTML=html;document.body.appendChild(host);
  try{const el=host.firstElementChild;el.style.margin='0 auto';el.style.maxWidth=el.classList.contains('cert3')?'794px':'700px';
-  const cv=await window.html2canvas(el,{scale:2,backgroundColor:'#ffffff',useCORS:true,logging:false});
+  const cv=await window.html2canvas(el,{scale:1.6,backgroundColor:'#ffffff',useCORS:true,logging:false});
   const pdf=new window.jspdf.jsPDF({unit:'mm',format:'a4',compress:true});let w=200,h=w*cv.height/cv.width;if(h>287){h=287;w=h*cv.width/cv.height}
-  pdf.addImage(cv.toDataURL('image/jpeg',0.92),'JPEG',(210-w)/2,5,w,h);
+  pdf.addImage(cv.toDataURL('image/jpeg',0.82),'JPEG',(210-w)/2,5,w,h);
   return new File([pdf.output('blob')],name+'.pdf',{type:'application/pdf'})}finally{host.remove()}}
 const PDFC=new Map();const hsh=t=>{let h=5381;for(let i=0;i<t.length;i++)h=((h<<5)+h+t.charCodeAt(i))|0;return h};
 async function docPdf(o,kind){const key=kind+':'+o.id+':'+hsh(JSON.stringify(o)+(SET.sn||'')+(SET.logo?1:0)+(SET.stamp?1:0));if(PDFC.has(key))return PDFC.get(key);
@@ -439,6 +440,20 @@ async function waPdf(o){const ph=phn(o.phone);if(ph.length<11)return toast('رق
 document.addEventListener('click',e=>{const b=e.target.closest('[data-a=wat]');if(!b)return;const o=inv.find(x=>x.id===b.dataset.i);if(o)waText(o)});
 const _sd3=showDoc;showDoc=(id,k)=>{_sd3(id,k);const o=inv.find(x=>x.id===id);if(o&&navigator.canShare)setTimeout(()=>prewarm(o),600)};
 setTimeout(()=>{hxLibs().catch(()=>{})},5000);
+
+const URLC=new Map();
+async function pdfUrl(o,kind){const key='u:'+kind+':'+o.id+':'+hsh(JSON.stringify(o)+(SET.sn||'')+(SET.logo?1:0)+(SET.stamp?1:0));if(URLC.has(key))return URLC.get(key);
+ const f=await docPdf(o,kind),sb=window.__sb,p=crypto.randomUUID().replace(/-/g,'')+'/'+f.name;
+ const{error}=await sb.storage.from('invoices-pdf').upload(p,f,{contentType:'application/pdf',cacheControl:'31536000',upsert:false});if(error)throw new Error(error.message);
+ const u=sb.storage.from('invoices-pdf').getPublicUrl(p).data.publicUrl;URLC.set(key,u);return u}
+function openChat(u){const w=window.open(u,'_blank');if(!w||w.closed)mod('<h3>جاهز ✅</h3><p>اضغط الزر لفتح محادثة العميل على واتساب.</p><a class="btn" style="display:block;text-align:center;text-decoration:none;color:#111" href="'+esc(u)+'" target="_blank" rel="noopener">فتح واتساب</a>',()=>{})}
+async function waLink(o){const ph=phn(o.phone);if(ph.length<11)return toast('رقم موبايل العميل غير صالح. عدّله من زر «تعديل».',1);
+ toast('جاري تجهيز الفاتورة...');
+ try{const hasW=o.wr&&o.items.some(i=>iM(i)>0),[ui,uw]=await Promise.all([pdfUrl(o,'inv'),hasW?pdfUrl(o,'war'):Promise.resolve(null)]);
+  const text='أهلاً '+o.name+' 👋\nفاتورتك من '+(SET.sn||'HARX PROTECTION')+' (رقم '+o.no+'):\n'+ui+(uw?'\n\nشهادة الضمان:\n'+uw:'')+(due(o)>0?'\n\nالمتبقي: '+EGP(due(o)):'')+'\n\nشكراً لثقتك بنا.';
+  openChat('https://api.whatsapp.com/send?phone='+ph+'&text='+encodeURIComponent(text));
+ }catch(e){toast('تعذّر رفع الملفات ('+(e&&e.message||e)+'). هفتح محادثة برسالة نصية.',1);waText(o)}}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-a=wash]');if(!b)return;const o=inv.find(x=>x.id===b.dataset.i);if(o)waPdf(o)});
 const _rd=render;render=()=>{_rd();const k=can('report');['#stats','#meth'].forEach(s=>{const e=$(s);if(e){e.style.display=k?'':'none';if(s==='#meth'&&e.previousElementSibling)e.previousElementSibling.style.display=k?'':'none'}})};
 const _rf=render;let _rt;render=()=>{clearTimeout(_rt);_rt=setTimeout(_rf,80)};
 render();
